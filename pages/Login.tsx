@@ -34,11 +34,14 @@ const Login: React.FC = () => {
     try {
       setLoading(true);
       setError('');
+      const APP_URL = (import.meta.env.VITE_APP_URL as string) || window.location.origin;
+      const redirectTo = `${APP_URL}/#/auth/callback`;
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'discord',
         options: {
           // using HashRouter, include the hash so user lands on the correct route
-          redirectTo: `${window.location.origin}/#/auth/callback`
+          redirectTo
         }
       });
 
