@@ -60,7 +60,7 @@ const Community: React.FC = () => {
             </div>
             <div className="lg:w-1/2 bg-white/5 relative min-h-[400px]">
               <img 
-                src="/IMAE.PNG" 
+                src="https://i.postimg.cc/g2CwrnP9/imae.png" 
                 alt="Community life" 
                 className="absolute inset-0 w-full h-full object-cover opacity-50 grayscale hover:grayscale-0 transition-all duration-1000"
               />
