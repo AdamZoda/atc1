@@ -27,5 +27,5 @@
 - `DISCORD_CLIENT_ID` and `DISCORD_CLIENT_SECRET` to populate `.env` and keep for reference.
 
 7) Testing
-- Start dev server, open `http://localhost:5173/#/login`, click "Se connecter avec Discord".
+- Start dev server, open `http://localhost:5173/#/login`, click "Discord".
 - If you get "redirect_uri OAuth2 non valide", ensure the `redirect_uri` in the Discord authorize URL exactly matches the redirect URL registered in Discord.

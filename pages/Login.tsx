@@ -125,10 +125,10 @@ const Login: React.FC = () => {
           <button
             onClick={handleDiscordLogin}
             disabled={loading}
-            aria-label="Se connecter avec Discord"
+            aria-label="Discord"
             className="w-full py-4 bg-[#5865F2] text-white font-black uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 mt-4 hover:brightness-105 disabled:opacity-50 transition-all"
           >
-            {loading ? 'Chargement...' : 'Se connecter avec Discord'}
+            {loading ? 'Chargement...' : 'Discord'}
           </button>
         </div>
 
