@@ -23,3 +23,9 @@ export interface NavLink {
   restricted?: boolean;
   adminOnly?: boolean;
 }
+
+export interface SiteSetting {
+  key: string;
+  value: string;
+  type: 'image' | 'video';
+}

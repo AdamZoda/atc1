@@ -1,10 +1,33 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { siteConfig } from '../site-config';
 import { Play, Users, Shield, Server, ArrowRight } from 'lucide-react';
+import { supabase } from '../supabaseClient';
+import { SiteSetting } from '../types';
 
 const Home: React.FC = () => {
+  const [background, setBackground] = useState<{ value: string; type: 'image' | 'video' } | null>(null);
+
+  useEffect(() => {
+    const fetchBackground = async () => {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('key', 'site_background')
+        .single();
+
+      if (data) {
+        setBackground({ value: data.value, type: data.type });
+      } else {
+        // Fallback to config
+        setBackground({ value: siteConfig.media.heroVideo, type: 'video' });
+      }
+    };
+
+    fetchBackground();
+  }, []);
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -14,17 +37,28 @@ const Home: React.FC = () => {
     >
       {/* Hero Section */}
       <section className="relative h-screen flex items-center justify-center overflow-hidden">
-        {/* Video Background */}
+        {/* Dynamic Background */}
         <div className="absolute inset-0 z-0">
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="w-full h-full object-cover opacity-40"
-          >
-            <source src={siteConfig.media.heroVideo} type="video/mp4" />
-          </video>
+          {background && (
+            background.type === 'video' ? (
+              <video
+                autoPlay
+                loop
+                muted
+                playsInline
+                key={background.value} // Force reload on source change
+                className="w-full h-full object-cover opacity-40"
+              >
+                <source src={background.value} type="video/mp4" />
+              </video>
+            ) : (
+              <img 
+                src={background.value} 
+                className="w-full h-full object-cover opacity-40" 
+                alt="Background"
+              />
+            )
+          )}
           <div className="absolute inset-0 bg-gradient-to-b from-luxury-dark/80 via-luxury-dark/20 to-luxury-dark"></div>
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_0%,_#050505_90%)]"></div>
         </div>
