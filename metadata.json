@@ -1,0 +1,8 @@
+{
+  "name": "Atlantic RP Platform",
+  "description": "A luxury multi-page web platform for the Atlantic RP FiveM server, featuring a dark Moroccan theme, admin dashboard, and media gallery.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
