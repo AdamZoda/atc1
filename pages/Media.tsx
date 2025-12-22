@@ -17,6 +17,8 @@ const Media: React.FC = () => {
   const [profile, setProfile] = useState<any>(null);
   const { t } = useLanguage();
 
+  const DEFAULT_AVATAR = 'https://i.postimg.cc/rF1jc0R2/depositphotos-51405259-stock-illustration-male-avatar-profile-picture-use.jpg';
+
   useEffect(() => {
     fetchPosts();
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -69,10 +71,10 @@ const Media: React.FC = () => {
         data.map(async (comment: any) => {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('username')
+            .select('username, avatar_url')
             .eq('id', comment.user_id)
             .single();
-          return { ...comment, username: profile?.username || 'Anonymous' };
+          return { ...comment, username: profile?.username || 'Anonymous', avatar_url: profile?.avatar_url || DEFAULT_AVATAR };
         })
       );
       setComments(commentsWithUsernames);
@@ -293,23 +295,26 @@ const Media: React.FC = () => {
                         ) : (
                           <div className="space-y-4 pr-4">
                             {comments.map((comment) => (
-                              <div key={comment.id} className="p-4 glass rounded-lg border border-white/5">
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="text-sm font-bold text-luxury-gold">{comment.username}</span>
-                                  <span className="text-xs text-gray-500">
-                                    {new Date(comment.created_at).toLocaleDateString('fr-FR')}
-                                  </span>
+                              <div key={comment.id} className="p-4 glass rounded-lg border border-white/5 flex gap-3">
+                                <img src={comment.avatar_url || DEFAULT_AVATAR} alt="avatar" className="w-12 h-12 rounded-full object-cover border border-white/10 flex-shrink-0" />
+                                <div className="flex-1">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-sm font-bold text-luxury-gold">{comment.username}</span>
+                                    <span className="text-xs text-gray-500">
+                                      {new Date(comment.created_at).toLocaleDateString('fr-FR')}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-gray-300 mb-3">{comment.content}</p>
+                                  {(session?.user.id === comment.user_id || profile?.role === 'admin') && (
+                                    <button
+                                      onClick={() => deleteComment(comment.id)}
+                                      className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1 transition-colors"
+                                    >
+                                      <Trash2 size={12} />
+                                      {t('comments.delete')}
+                                    </button>
+                                  )}
                                 </div>
-                                <p className="text-sm text-gray-300 mb-3">{comment.content}</p>
-                                {(session?.user.id === comment.user_id || profile?.role === 'admin') && (
-                                  <button
-                                    onClick={() => deleteComment(comment.id)}
-                                    className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1 transition-colors"
-                                  >
-                                    <Trash2 size={12} />
-                                    {t('comments.delete')}
-                                  </button>
-                                )}
                               </div>
                             ))}
                           </div>

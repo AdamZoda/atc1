@@ -16,6 +16,8 @@ import Shop from './pages/Shop';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import AuthCallback from './pages/AuthCallback';
+import ProfilePage from './pages/Profile';
 
 // Components
 import Navbar from './components/Navbar';
@@ -107,10 +109,13 @@ const AppContent = () => {
               path="/admin" 
               element={(profile && profile.role === 'admin') ? <Admin /> : <Navigate to="/" />} 
             />
+
+            <Route path="/profile" element={session ? <ProfilePage /> : <Navigate to="/login" />} />
             
             {/* Auth Routes */}
             <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
             <Route path="/signup" element={!session ? <Signup /> : <Navigate to="/" />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
           </Routes>
         </AnimatePresence>
       </main>

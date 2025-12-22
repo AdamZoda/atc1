@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 // Fixed: Added AnimatePresence to the framer-motion import
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,8 +13,11 @@ interface NavbarProps {
   profile: Profile | null;
 }
 
+const DEFAULT_AVATAR = 'https://i.postimg.cc/rF1jc0R2/depositphotos-51405259-stock-illustration-male-avatar-profile-picture-use.jpg';
+
 const Navbar: React.FC<NavbarProps> = ({ profile }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [fallbackName, setFallbackName] = useState<string | null>(null);
   const location = useLocation();
   const { language, setLanguage, t } = useLanguage();
 
@@ -34,6 +37,30 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
+
+  useEffect(() => {
+    // If there's no profile username, attempt to read provider identity (Discord) from the current session
+    if (!profile) {
+      (async () => {
+        try {
+          const { data } = await supabase.auth.getUser();
+          const user = (data as any)?.user;
+          if (user) {
+            const identity = (user.identities || []).find((i: any) => i.provider === 'discord');
+            if (identity?.identity_data) {
+              const idata = identity.identity_data as any;
+              const name = idata.username ? `${idata.username}${idata.discriminator ? '#' + idata.discriminator : ''}` : user.email || user.id;
+              setFallbackName(name);
+            } else {
+              setFallbackName(user.email || null);
+            }
+          }
+        } catch (e) {
+          console.warn('Could not read session identity for fallback name', e);
+        }
+      })();
+    }
+  }, [profile]);
 
   return (
     <nav className="fixed w-full z-50 px-4 py-4 md:px-10">
@@ -82,8 +109,25 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
 
           {profile ? (
             <div className="flex items-center gap-4">
+              <Link to="/profile" className="flex items-center gap-3">
+                <img
+                  src={profile.avatar_url || DEFAULT_AVATAR}
+                  alt="avatar"
+                  className="w-10 h-10 rounded-full object-cover border border-white/10"
+                />
+              </Link>
+
               <div className="flex flex-col items-end">
-                <span className="text-sm font-semibold text-white">{profile.username}</span>
+                {(() => {
+                  const nameFromProfile = profile?.username || '';
+                  const isEmail = nameFromProfile.includes && nameFromProfile.includes('@');
+                  const display = !isEmail && nameFromProfile ? nameFromProfile : (fallbackName || nameFromProfile || profile?.id);
+                  return (
+                    <Link to="/profile" className="text-sm font-semibold text-white hover:underline">
+                      {display}
+                    </Link>
+                  );
+                })()}
                 <span className="text-[10px] uppercase tracking-tighter text-luxury-gold">{profile.role}</span>
               </div>
               <button 

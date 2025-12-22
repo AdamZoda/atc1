@@ -30,6 +30,29 @@ const Login: React.FC = () => {
     }
   };
 
+  const handleDiscordLogin = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'discord',
+        options: {
+          // using HashRouter, include the hash so user lands on the correct route
+          redirectTo: `${window.location.origin}/#/auth/callback`
+        }
+      });
+
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+      }
+      // on success Supabase will redirect the user to the `redirectTo` URL
+    } catch (err: any) {
+      setError(err?.message || 'Erreur lors de la connexion');
+      setLoading(false);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -97,6 +120,17 @@ const Login: React.FC = () => {
             <ArrowRight size={18} />
           </button>
         </form>
+
+        <div className="mt-6">
+          <button
+            onClick={handleDiscordLogin}
+            disabled={loading}
+            aria-label="Se connecter avec Discord"
+            className="w-full py-4 bg-[#5865F2] text-white font-black uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 mt-4 hover:brightness-105 disabled:opacity-50 transition-all"
+          >
+            {loading ? 'Chargement...' : 'Se connecter avec Discord'}
+          </button>
+        </div>
 
         <div className="mt-10 text-center space-y-4">
           <p className="text-gray-500 text-xs font-bold uppercase tracking-widest">
