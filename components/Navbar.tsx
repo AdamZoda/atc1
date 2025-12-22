@@ -40,7 +40,7 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
       <div className="max-w-7xl mx-auto glass rounded-2xl flex items-center justify-between px-6 py-4">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-3">
-          <img src="/ATC.png" alt="Atlantic RP" className="h-12 w-auto" />
+          <img src="https://i.postimg.cc/L4wgGYg6/ATC.png" alt="Atlantic RP" className="h-12 w-auto" />
           <span className="hidden md:block font-cinzel text-xl font-bold tracking-widest bg-gradient-to-r from-luxury-gold to-white bg-clip-text text-transparent">
             ATLANTIC RP
           </span>

@@ -13,7 +13,7 @@ const Footer: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
           {/* Brand Info */}
           <div className="col-span-1 md:col-span-1">
-            <img src="/ATC.png" alt="Atlantic RP" className="h-16 w-auto mb-6" />
+            <img src="https://i.postimg.cc/L4wgGYg6/ATC.png" alt="Atlantic RP" className="h-16 w-auto mb-6" />
             <h2 className="font-cinzel text-2xl font-black text-luxury-gold mb-3 tracking-widest">ATLANTIC RP</h2>
             <p className="text-gray-400 leading-relaxed text-sm">
               L'expérience Roleplay ultime inspirée par le luxe et l'exclusivité. Rejoignez une communauté mature et passionnée.

@@ -313,7 +313,7 @@ const Admin: React.FC = () => {
       <div className="max-w-7xl mx-auto px-6">
         <header className="mb-12 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
-            <img src="/ATC.png" alt="Atlantic RP" className="h-16 w-auto" />
+            <img src="https://i.postimg.cc/L4wgGYg6/ATC.png" alt="Atlantic RP" className="h-16 w-auto" />
             <div>
               <h2 className="font-cinzel text-4xl font-black">ADMIN <span className="text-luxury-gold">PANEL</span></h2>
               <p className="text-gray-500 uppercase tracking-widest text-[10px] font-bold">Gestion Atlantique RP</p>
