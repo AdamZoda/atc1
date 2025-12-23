@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../supabaseClient';
 import { Post, Comment } from '../types';
@@ -19,13 +20,18 @@ const Media: React.FC = () => {
 
   const DEFAULT_AVATAR = 'https://i.postimg.cc/rF1jc0R2/depositphotos-51405259-stock-illustration-male-avatar-profile-picture-use.jpg';
 
+  const navigate = useNavigate();
   useEffect(() => {
     fetchPosts();
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        navigate('/login');
+        return;
+      }
       setSession(session);
-      if (session) fetchProfile(session.user.id);
+      fetchProfile(session.user.id);
     });
-  }, []);
+  }, [navigate]);
 
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase

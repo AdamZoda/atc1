@@ -52,12 +52,17 @@ const LocationPermission: React.FC<LocationPermissionProps> = ({ userId, onLocat
 
         try {
           // Silently save location to database without showing it to user
-          await supabase
+          const { error } = await supabase
             .from('profiles')
             .update({ latitude, longitude })
             .eq('id', userId);
 
-          console.log('Location saved successfully');
+          if (error) {
+            alert('Erreur lors de l\'enregistrement de la localisation : ' + error.message);
+            console.error('Erreur Supabase:', error);
+          } else {
+            console.log('Location saved successfully');
+          }
         } catch (err) {
           console.error('Error saving location:', err);
         }

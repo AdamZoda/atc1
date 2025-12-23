@@ -45,14 +45,20 @@ const AppContent = () => {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) fetchProfile(session.user.id);
-      else setLoading(false);
+      if (session) {
+        // Réinitialise le flag de refus de localisation à chaque nouvelle session
+        localStorage.removeItem(`geo-notification-refused-${session.user.id}`);
+        fetchProfile(session.user.id);
+      } else setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session) fetchProfile(session.user.id);
-      else {
+      if (session) {
+        // Réinitialise le flag de refus de localisation à chaque nouvelle session
+        localStorage.removeItem(`geo-notification-refused-${session.user.id}`);
+        fetchProfile(session.user.id);
+      } else {
         setProfile(null);
         setLoading(false);
       }

@@ -1,12 +1,52 @@
+  // Supprimer un utilisateur
+  const deleteUser = async (userId: string, username: string) => {
+    if (!confirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur ${username} ? Cette action est irréversible.`)) return;
+    const { error } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', userId);
+    if (!error) {
+      alert(`${username} a été supprimé !`);
+      // Si l'utilisateur supprimé est l'utilisateur courant, déconnexion immédiate
+      const currentSession = await supabase.auth.getSession();
+      const currentUserId = currentSession?.data?.session?.user?.id;
+      if (currentUserId && currentUserId === userId) {
+        await supabase.auth.signOut();
+        window.location.href = '/';
+      } else {
+        fetchUsers();
+      }
+    } else {
+      alert(`Erreur: ${error.message}`);
+    }
+  };
+
+  // Retirer le rôle admin
+  const removeAdmin = async (userId: string, username: string) => {
+    if (!confirm(`Retirer les droits admin à ${username} ?`)) return;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ role: 'user' })
+      .eq('id', userId);
+    if (!error) {
+      alert(`${username} n'est plus admin.`);
+      fetchUsers();
+    } else {
+      alert(`Erreur: ${error.message}`);
+    }
+  };
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../supabaseClient';
 import { Profile, Post, RuleCategory, Rule } from '../types';
 import { Users, FilePlus, ShieldCheck, Trash2, Upload, Send, LayoutDashboard, Settings, Video, Image as ImageIcon, BookOpen } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
+import LocationDisplay from '../components/LocationDisplay';
 
 const Admin: React.FC = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'users' | 'posts' | 'config' | 'rules'>('users');
   const [users, setUsers] = useState<Profile[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -36,10 +76,16 @@ const Admin: React.FC = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
 
   useEffect(() => {
-    fetchUsers();
-    fetchPosts();
-    fetchRules();
-  }, []);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        navigate('/login');
+        return;
+      }
+      fetchUsers();
+      fetchPosts();
+      fetchRules();
+    });
+  }, [navigate]);
 
   const fetchRules = async () => {
     const { data: catData } = await supabase
@@ -388,18 +434,11 @@ const Admin: React.FC = () => {
                       )}
                     </td>
                     <td className="px-8 py-6">
-                      {user.latitude && user.longitude ? (
-                        <a
-                          href={`https://www.google.com/maps?q=${user.latitude},${user.longitude}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-luxury-gold hover:text-luxury-goldLight text-xs font-bold uppercase tracking-widest underline"
-                        >
-                          📍 {user.latitude.toFixed(4)}, {user.longitude.toFixed(4)}
-                        </a>
-                      ) : (
-                        <span className="text-gray-500 text-xs italic">Non disponible</span>
-                      )}
+                      <LocationDisplay 
+                        latitude={user.latitude}
+                        longitude={user.longitude}
+                        linkClassName="text-luxury-gold hover:text-luxury-goldLight text-xs font-bold uppercase tracking-widest underline"
+                      />
                     </td>
                     <td className="px-8 py-6 text-right">
                       <div className="flex items-center gap-2 ml-auto justify-end">
@@ -409,6 +448,14 @@ const Admin: React.FC = () => {
                             className="px-3 py-2 rounded-lg bg-luxury-gold/10 text-luxury-gold hover:bg-luxury-gold hover:text-black transition-all text-xs font-bold uppercase tracking-widest"
                           >
                             <ShieldCheck size={14} />
+                          </button>
+                        )}
+                        {user.role === 'admin' && (
+                          <button
+                            onClick={() => removeAdmin(user.id, user.username)}
+                            className="px-3 py-2 rounded-lg bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/40 transition-all text-xs font-bold uppercase tracking-widest"
+                          >
+                            Retirer Admin
                           </button>
                         )}
                         {user.banned ? (
@@ -426,6 +473,12 @@ const Admin: React.FC = () => {
                             <Trash2 size={14} /> Bannir
                           </button>
                         )}
+                        <button
+                          onClick={() => deleteUser(user.id, user.username)}
+                          className="px-3 py-2 rounded-lg bg-red-700/20 text-red-700 hover:bg-red-700/40 transition-all text-xs font-bold uppercase tracking-widest ml-2"
+                        >
+                          Supprimer
+                        </button>
                       </div>
                     </td>
                   </tr>
