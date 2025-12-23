@@ -7,6 +7,8 @@ export interface Profile {
   role: UserRole;
   avatar_url?: string;
   banned?: boolean;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface Post {

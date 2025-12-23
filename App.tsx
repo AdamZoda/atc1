@@ -22,11 +22,13 @@ import ProfilePage from './pages/Profile';
 // Components
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
+import LocationPermission from './components/LocationPermission';
 
 const AppContent = () => {
   const [session, setSession] = useState<any>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showLocationPermission, setShowLocationPermission] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
@@ -75,6 +77,20 @@ const AppContent = () => {
         await supabase.auth.signOut();
         setSession(null);
         setProfile(null);
+      } else {
+        // Check if user needs to authorize location - show permission prompt
+        // BUT: don't show if user already refused (localStorage flag)
+        const hasRefused = localStorage.getItem(`geo-notification-refused-${userId}`) === 'true';
+        
+        // Force show if ?forceLocation=true in URL (for testing)
+        const urlParams = new URLSearchParams(window.location.search);
+        const forceLocation = urlParams.get('forceLocation') === 'true';
+        
+        if (!hasRefused && (!data.latitude || !data.longitude || forceLocation)) {
+          setShowLocationPermission(true);
+          setLoading(false);
+          return;
+        }
       }
     }
     setLoading(false);
@@ -85,6 +101,19 @@ const AppContent = () => {
       <div className="h-screen w-screen flex items-center justify-center bg-luxury-dark">
         <div className="w-12 h-12 border-4 border-luxury-gold border-t-transparent rounded-full animate-spin"></div>
       </div>
+    );
+  }
+
+  // Show location permission screen if user is logged in but hasn't authorized location
+  if (showLocationPermission && session) {
+    return (
+      <LocationPermission
+        userId={session.user.id}
+        onLocationGranted={() => {
+          setShowLocationPermission(false);
+          fetchProfile(session.user.id);
+        }}
+      />
     );
   }
 

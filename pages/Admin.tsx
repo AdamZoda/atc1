@@ -356,6 +356,7 @@ const Admin: React.FC = () => {
                   <th className="px-8 py-6 text-sm font-bold uppercase tracking-widest text-gray-400">Utilisateur</th>
                   <th className="px-8 py-6 text-sm font-bold uppercase tracking-widest text-gray-400">Rôle</th>
                   <th className="px-8 py-6 text-sm font-bold uppercase tracking-widest text-gray-400">Statut</th>
+                  <th className="px-8 py-6 text-sm font-bold uppercase tracking-widest text-gray-400">Localisation</th>
                   <th className="px-8 py-6 text-sm font-bold uppercase tracking-widest text-gray-400 text-right">Actions</th>
                 </tr>
               </thead>
@@ -384,6 +385,20 @@ const Admin: React.FC = () => {
                         <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-green-500/20 text-green-400">
                           ✓ Actif
                         </span>
+                      )}
+                    </td>
+                    <td className="px-8 py-6">
+                      {user.latitude && user.longitude ? (
+                        <a
+                          href={`https://www.google.com/maps?q=${user.latitude},${user.longitude}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-luxury-gold hover:text-luxury-goldLight text-xs font-bold uppercase tracking-widest underline"
+                        >
+                          📍 {user.latitude.toFixed(4)}, {user.longitude.toFixed(4)}
+                        </a>
+                      ) : (
+                        <span className="text-gray-500 text-xs italic">Non disponible</span>
                       )}
                     </td>
                     <td className="px-8 py-6 text-right">

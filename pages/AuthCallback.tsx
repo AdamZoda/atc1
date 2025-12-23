@@ -58,15 +58,14 @@ const AuthCallback: React.FC = () => {
           try {
             const user = (data.session as any).user;
             await persistProfileFromUser(user);
+            // Redirect to home with location permission handling
+            setMessage('Connexion réussie, redirection...');
+            navigate('/');
+            setTimeout(() => window.location.reload(), 300);
           } catch (e) {
             console.error('Failed to persist profile from session:', e);
           }
 
-          setMessage('Connexion réussie, redirection...');
-          // ensure app state picks up the session — navigate then reload
-          navigate('/');
-          // small delay to let navigation happen then reload
-          setTimeout(() => window.location.reload(), 300);
           return;
         }
 
@@ -79,13 +78,14 @@ const AuthCallback: React.FC = () => {
           try {
             const user = (sessionData.session as any).user;
             await persistProfileFromUser(user);
+            // Redirect to home with location permission handling
+            setMessage('Connexion réussie, redirection...');
+            navigate('/');
+            setTimeout(() => window.location.reload(), 300);
           } catch (e) {
             console.error('Failed to persist profile from sessionData:', e);
           }
 
-          setMessage('Connexion récupérée, redirection...');
-          navigate('/');
-          setTimeout(() => window.location.reload(), 300);
           return;
         }
 
