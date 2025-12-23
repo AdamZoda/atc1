@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
-import { supabase } from './supabaseClient';
+import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { Profile } from './types';
 import { LanguageProvider } from './LanguageContext';
 
@@ -23,8 +23,19 @@ import ProfilePage from './pages/Profile';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import LocationPermission from './components/LocationPermission';
+import ConfigError from './components/ConfigError';
 
 const AppContent = () => {
+  // Check if Supabase is properly configured
+  if (!isSupabaseConfigured()) {
+    return (
+      <ConfigError
+        title="Configuration Supabase Manquante"
+        error={`Les variables d'environnement Supabase ne sont pas configurées.\n\nVariables requises:\n• VITE_SUPABASE_URL\n• VITE_SUPABASE_ANON_KEY\n\nAssurez-vous que le fichier .env.local existe et contient ces variables.`}
+      />
+    );
+  }
+
   const [session, setSession] = useState<any>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
