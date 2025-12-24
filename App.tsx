@@ -3,9 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
-import { Profile } from './types';
+import { Profile, SiteSetting } from './types';
 import { LanguageProvider } from './LanguageContext';
 import { PageVisibilityProvider } from './PageVisibilityContext';
+import { siteConfig } from './site-config';
 
 // Pages
 import Home from './pages/Home';
@@ -14,6 +15,7 @@ import Rules from './pages/Rules';
 import Community from './pages/Community';
 import Media from './pages/Media';
 import Shop from './pages/Shop';
+import About from './pages/About';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -42,6 +44,7 @@ const AppContent = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [showLocationPermission, setShowLocationPermission] = useState(false);
+  const [background, setBackground] = useState<{ value: string; type: 'image' | 'video' } | null>(null);
   const location = useLocation();
 
   useEffect(() => {
@@ -57,7 +60,7 @@ const AppContent = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session) {
-        // Réinitialise le flag de refus de localisation à chaque nouvelle session
+        // Réinitialises le flag de refus de localisation à chaque nouvelle session
         localStorage.removeItem(`geo-notification-refused-${session.user.id}`);
         fetchProfile(session.user.id);
       } else {
@@ -69,13 +72,33 @@ const AppContent = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Charger le background global une fois au démarrage
+  useEffect(() => {
+    const fetchBackground = async () => {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('key', 'site_background')
+        .single();
+
+      if (data) {
+        setBackground({ value: data.value, type: data.type });
+      } else {
+        // Fallback to config
+        setBackground({ value: siteConfig.media.heroVideo, type: 'video' });
+      }
+    };
+
+    fetchBackground();
+  }, []);
+
   // Auto-refresh pour les utilisateurs normaux (PAS LES ADMINS)
   useEffect(() => {
     if (profile && profile.role !== 'admin') {
-      // Refresh la page toutes les 30 secondes pour les utilisateurs normaux
+      // Refresh la page toutes les 60 secondes pour les utilisateurs normaux
       const refreshInterval = setInterval(() => {
         window.location.reload();
-      }, 30000); // 30 secondes
+      }, 60000); // 60 secondes (1 minute)
 
       return () => clearInterval(refreshInterval);
     }
@@ -137,38 +160,68 @@ const AppContent = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col selection:bg-luxury-gold selection:text-black">
-      <Navbar profile={profile} />
-      <main className="flex-grow">
-        <AnimatePresence mode="wait">
-          <Routes location={location} key={location.pathname}>
-            <Route path="/" element={<Home />} />
-            <Route path="/features" element={<Features />} />
-            <Route path="/rules" element={<Rules />} />
-            <Route path="/community" element={<Community />} />
-            <Route path="/game" element={<GamePage profile={profile} />} />
-            <Route path="/shop" element={<Shop />} />
-            
-            {/* Protected Routes */}
-            <Route 
-              path="/media" 
-              element={session ? <Media /> : <Navigate to="/signup" />} 
+    <div className="min-h-screen flex flex-col selection:bg-luxury-gold selection:text-black relative">
+      {/* Global Background - Visible on ALL pages */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        {background && (
+          background.type === 'video' ? (
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
+              key={background.value}
+              className="w-full h-full object-cover opacity-40"
+            >
+              <source src={background.value} type="video/mp4" />
+            </video>
+          ) : (
+            <img 
+              src={background.value} 
+              className="w-full h-full object-cover opacity-40" 
+              alt="Background"
             />
-            <Route 
-              path="/admin" 
-              element={(profile && profile.role === 'admin') ? <Admin /> : <Navigate to="/" />} 
-            />
+          )
+        )}
+        <div className="absolute inset-0 bg-gradient-to-b from-luxury-dark/80 via-luxury-dark/20 to-luxury-dark"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_0%,_#050505_90%)]"></div>
+      </div>
 
-            <Route path="/profile" element={session ? <ProfilePage /> : <Navigate to="/login" />} />
-            
-            {/* Auth Routes */}
-            <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
-            <Route path="/signup" element={!session ? <Signup /> : <Navigate to="/" />} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
-          </Routes>
-        </AnimatePresence>
-      </main>
-      <Footer />
+      {/* Content - Z index higher than background */}
+      <div className="relative z-10">
+        <Navbar profile={profile} />
+        <main className="flex-grow">
+          <AnimatePresence mode="wait">
+            <Routes location={location} key={location.pathname}>
+              <Route path="/" element={<Home />} />
+              <Route path="/features" element={<Features />} />
+              <Route path="/rules" element={<Rules />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/community" element={<Community />} />
+              <Route path="/game" element={<GamePage profile={profile} />} />
+              <Route path="/shop" element={<Shop />} />
+              
+              {/* Protected Routes */}
+              <Route 
+                path="/media" 
+                element={session ? <Media /> : <Navigate to="/signup" />} 
+              />
+              <Route 
+                path="/admin" 
+                element={(profile && profile.role === 'admin') ? <Admin /> : <Navigate to="/" />} 
+              />
+
+              <Route path="/profile" element={session ? <ProfilePage /> : <Navigate to="/login" />} />
+              
+              {/* Auth Routes */}
+              <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
+              <Route path="/signup" element={!session ? <Signup /> : <Navigate to="/" />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
+            </Routes>
+          </AnimatePresence>
+        </main>
+        <Footer />
+      </div>
     </div>
   );
 };
