@@ -3,9 +3,11 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { siteConfig } from '../site-config';
 import { MessageSquare, Twitter, Instagram, Youtube, Users } from 'lucide-react';
+import AccessControl from '../components/AccessControl';
 
 const Community: React.FC = () => {
   return (
+    <AccessControl pageName="Community">
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -70,6 +72,7 @@ const Community: React.FC = () => {
         </section>
       </div>
     </motion.div>
+    </AccessControl>
   );
 };
 

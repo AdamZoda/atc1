@@ -5,6 +5,7 @@ import { ShieldCheck, User, Skull, Info } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { RuleCategory, Rule } from '../types';
 import { useLanguage } from '../LanguageContext';
+import AccessControl from '../components/AccessControl';
 
 const sections = [
   {
@@ -74,6 +75,7 @@ const Rules: React.FC = () => {
   };
 
   return (
+    <AccessControl pageName="Rules">
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -156,6 +158,7 @@ const Rules: React.FC = () => {
         )}
       </div>
     </motion.div>
+    </AccessControl>
   );
 };
 

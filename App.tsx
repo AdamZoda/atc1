@@ -5,6 +5,7 @@ import { AnimatePresence } from 'framer-motion';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { Profile } from './types';
 import { LanguageProvider } from './LanguageContext';
+import { PageVisibilityProvider } from './PageVisibilityContext';
 
 // Pages
 import Home from './pages/Home';
@@ -18,6 +19,7 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import AuthCallback from './pages/AuthCallback';
 import ProfilePage from './pages/Profile';
+import GamePage from './pages/Game';
 
 // Components
 import Navbar from './components/Navbar';
@@ -144,6 +146,7 @@ const AppContent = () => {
             <Route path="/features" element={<Features />} />
             <Route path="/rules" element={<Rules />} />
             <Route path="/community" element={<Community />} />
+            <Route path="/game" element={<GamePage profile={profile} />} />
             <Route path="/shop" element={<Shop />} />
             
             {/* Protected Routes */}
@@ -173,9 +176,11 @@ const AppContent = () => {
 const App = () => {
   return (
     <LanguageProvider>
-      <Router>
-        <AppContent />
-      </Router>
+      <PageVisibilityProvider>
+        <Router>
+          <AppContent />
+        </Router>
+      </PageVisibilityProvider>
     </LanguageProvider>
   );
 };

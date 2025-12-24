@@ -8,6 +8,7 @@ import { Profile, NavLink } from '../types';
 import { siteConfig } from '../site-config';
 import { supabase } from '../supabaseClient';
 import { useLanguage } from '../LanguageContext';
+import { usePageVisibility } from '../PageVisibilityContext';
 
 interface NavbarProps {
   profile: Profile | null;
@@ -18,21 +19,28 @@ const DEFAULT_AVATAR = 'https://i.postimg.cc/rF1jc0R2/depositphotos-51405259-sto
 const Navbar: React.FC<NavbarProps> = ({ profile }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [fallbackName, setFallbackName] = useState<string | null>(null);
+  const [isGamePageVisible, setIsGamePageVisible] = useState(true);
   const location = useLocation();
   const { language, setLanguage, t } = useLanguage();
+  const { isPageVisible } = usePageVisibility();
 
-  const navLinks: NavLink[] = [
-    { label: t('nav.home'), path: '/' },
-    { label: t('nav.features'), path: '/features' },
-    { label: t('nav.rules'), path: '/rules' },
-    { label: t('nav.community'), path: '/community' },
-    { label: 'Shop', path: '/shop' },
-    { label: t('nav.media'), path: '/media', restricted: true },
-  ];
+  const getNavLinks = (): NavLink[] => {
+    const links: NavLink[] = [
+      { label: t('nav.home'), path: '/', visible: isPageVisible('Home') },
+      { label: t('nav.features'), path: '/features', visible: isPageVisible('Features') },
+      { label: t('nav.rules'), path: '/rules', visible: isPageVisible('Rules') },
+      { label: t('nav.community'), path: '/community', visible: isPageVisible('Community') },
+      ...(isPageVisible('Game') || profile?.role === 'admin' ? [{ label: 'Jeu', path: '/game', visible: true }] : []),
+      { label: 'Shop', path: '/shop', visible: isPageVisible('Shop') },
+      { label: t('nav.media'), path: '/media', restricted: true, visible: isPageVisible('Gallery') },
+    ];
 
-  if (profile?.role === 'admin') {
-    navLinks.push({ label: t('nav.admin'), path: '/admin', adminOnly: true });
-  }
+    if (profile?.role === 'admin') {
+      links.push({ label: t('nav.admin'), path: '/admin', adminOnly: true, visible: true });
+    }
+
+    return links;
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -62,6 +70,39 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
     }
   }, [profile]);
 
+  // Fetch game page visibility
+  useEffect(() => {
+    const fetchGamePageVisibility = async () => {
+      try {
+        const { data } = await supabase
+          .from('game_admin_settings')
+          .select('page_visible')
+          .eq('id', 'game-settings')
+          .single();
+
+        if (data) {
+          setIsGamePageVisible(data.page_visible ?? true);
+        }
+      } catch (error) {
+        console.error('Error fetching game page visibility:', error);
+      }
+    };
+
+    fetchGamePageVisibility();
+
+    // Subscribe to real-time updates
+    const subscription = supabase
+      .channel('public:game_admin_settings')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'game_admin_settings' }, () =>
+        fetchGamePageVisibility()
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   return (
     <nav className="fixed w-full z-50 px-4 py-4 md:px-10">
       <div className="max-w-7xl mx-auto glass rounded-2xl flex items-center justify-between px-6 py-4">
@@ -75,22 +116,24 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
 
         {/* Desktop Links */}
         <div className="hidden lg:flex items-center gap-8">
-          {navLinks.map((link) => (
-            <Link
-              key={link.path}
-              to={link.path}
-              className={`relative font-medium transition-colors duration-300 hover:text-luxury-gold ${
-                location.pathname === link.path ? 'text-luxury-gold' : 'text-gray-300'
-              }`}
-            >
-              {link.label}
-              {location.pathname === link.path && (
-                <motion.div
-                  layoutId="activeLink"
-                  className="absolute -bottom-1 left-0 right-0 h-0.5 bg-luxury-gold"
-                />
-              )}
-            </Link>
+          {getNavLinks().map((link) => (
+            link.visible === true && (
+              <Link
+                key={link.path}
+                to={link.path}
+                className={`relative font-medium transition-colors duration-300 hover:text-luxury-gold ${
+                  location.pathname === link.path ? 'text-luxury-gold' : 'text-gray-300'
+                }`}
+              >
+                {link.label}
+                {location.pathname === link.path && (
+                  <motion.div
+                    layoutId="activeLink"
+                    className="absolute -bottom-1 left-0 right-0 h-0.5 bg-luxury-gold"
+                  />
+                )}
+              </Link>
+            )
           ))}
         </div>
 
@@ -164,17 +207,19 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
             className="lg:hidden absolute top-24 left-4 right-4 glass rounded-2xl overflow-hidden shadow-2xl"
           >
             <div className="flex flex-col p-4 gap-4">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  onClick={() => setIsOpen(false)}
-                  className="px-4 py-3 rounded-lg hover:bg-white/5 transition-all flex items-center justify-between"
-                >
-                  <span className={location.pathname === link.path ? 'text-luxury-gold font-bold' : 'text-gray-300'}>
-                    {link.label}
-                  </span>
-                </Link>
+              {getNavLinks().map((link) => (
+                link.visible === true && (
+                  <Link
+                    key={link.path}
+                    to={link.path}
+                    onClick={() => setIsOpen(false)}
+                    className="px-4 py-3 rounded-lg hover:bg-white/5 transition-all flex items-center justify-between"
+                  >
+                    <span className={location.pathname === link.path ? 'text-luxury-gold font-bold' : 'text-gray-300'}>
+                      {link.label}
+                    </span>
+                  </Link>
+                )
               ))}
               {!profile && (
                 <Link

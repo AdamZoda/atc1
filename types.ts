@@ -36,6 +36,7 @@ export interface NavLink {
   path: string;
   restricted?: boolean;
   adminOnly?: boolean;
+  visible?: boolean;
 }
 
 export interface SiteSetting {

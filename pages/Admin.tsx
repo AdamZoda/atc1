@@ -63,17 +63,17 @@ const Admin: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
 
+  // Page visibility state
+  const [pageVisibilities, setPageVisibilities] = useState<{ [key: string]: boolean }>({});
+  const [pageVisibilityLoading, setPageVisibilityLoading] = useState(false);
+
+  // Rules state
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+
   // Site Config state
   const [bgUrl, setBgUrl] = useState('');
   const [bgType, setBgType] = useState<'image' | 'video'>('image');
   const [bgSubmitting, setBgSubmitting] = useState(false);
-
-  // Rules state
-  const [newCategoryName, setNewCategoryName] = useState('');
-  const [newCategoryDesc, setNewCategoryDesc] = useState('');
-  const [newRuleTitle, setNewRuleTitle] = useState('');
-  const [newRuleContent, setNewRuleContent] = useState('');
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -84,6 +84,7 @@ const Admin: React.FC = () => {
       fetchUsers();
       fetchPosts();
       fetchRules();
+      fetchPageVisibilities();
     });
   }, [navigate]);
 
@@ -127,6 +128,59 @@ const Admin: React.FC = () => {
       .update({ role: 'admin' })
       .eq('id', userId);
     if (!error) fetchUsers();
+  };
+
+  const fetchPageVisibilities = async () => {
+    try {
+      const { data } = await supabase
+        .from('page_visibility')
+        .select('*');
+
+      if (data) {
+        const visibilities: { [key: string]: boolean } = {};
+        data.forEach((page: any) => {
+          visibilities[page.id] = page.is_visible;
+        });
+        setPageVisibilities(visibilities);
+      }
+    } catch (error) {
+      console.error('Error fetching page visibilities:', error);
+    }
+  };
+
+  const updatePageVisibility = async (pageId: string, isVisible: boolean) => {
+    try {
+      setPageVisibilityLoading(true);
+      console.log('🔄 DÉBUT UPDATE - pageId:', pageId, 'isVisible:', isVisible);
+      console.log('📤 Envoi de la requête Supabase UPDATE...');
+      
+      // Utiliser l'UPDATE direct (RLS disabled)
+      const { error } = await supabase
+        .from('page_visibility')
+        .update({ is_visible: isVisible })
+        .eq('id', pageId);
+
+      console.log('✅ RÉPONSE SUPABASE - error:', error);
+
+      if (error) {
+        console.error('🔴 ERREUR DÉTECTÉE:', error.message, error.code, error.details);
+        throw error;
+      }
+
+      console.log('✨ Mise à jour UI locale...');
+      setPageVisibilities((prev) => ({
+        ...prev,
+        [pageId]: isVisible,
+      }));
+      
+      console.log('✅ SUCCESS COMPLET');
+      alert('✅ Changement sauvegardé!');
+    } catch (error) {
+      console.error('❌ ERREUR COMPLÈTE:', error);
+      alert('Erreur lors de la mise à jour: ' + (error as any).message);
+    } finally {
+      setPageVisibilityLoading(false);
+    }
   };
 
   const banUser = async (userId: string, username: string) => {
@@ -593,7 +647,52 @@ const Admin: React.FC = () => {
         )}
 
         {activeTab === 'config' && (
-          <div className="max-w-2xl mx-auto">
+          <div className="space-y-8">
+            {/* PAGE VISIBILITY SECTION */}
+            <div className="glass p-10 rounded-[3rem] border border-white/5">
+              <div className="text-center mb-10">
+                <div className="w-16 h-16 bg-luxury-gold/10 rounded-2xl flex items-center justify-center mx-auto mb-6 text-luxury-gold">
+                  👁️
+                </div>
+                <h3 className="text-2xl font-cinzel font-bold uppercase tracking-widest">Visibilité des Pages</h3>
+                <p className="text-gray-500 text-sm mt-2">Masquez ou affichez les pages pour tous les utilisateurs</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {Object.entries({
+                  'page-home': '🏠 Accueil',
+                  'page-features': '✨ Fonctionnalités',
+                  'page-rules': '📋 Règles',
+                  'page-community': '👥 Communauté',
+                  'page-game': '🎮 Jeu',
+                  'page-shop': '🛍️ Shop',
+                  'page-gallery': '🎨 Galerie',
+                }).map(([pageId, label]) => (
+                  <button
+                    key={pageId}
+                    onClick={() => updatePageVisibility(pageId, !pageVisibilities[pageId])}
+                    disabled={pageVisibilityLoading}
+                    className={`p-4 rounded-xl font-bold uppercase tracking-widest text-sm transition-all flex items-center justify-between ${
+                      pageVisibilities[pageId]
+                        ? 'bg-green-600/20 border border-green-600 text-green-400 hover:bg-green-600/30'
+                        : 'bg-red-600/20 border border-red-600 text-red-400 hover:bg-red-600/30'
+                    } disabled:opacity-50`}
+                  >
+                    <span>{label}</span>
+                    <span>{pageVisibilities[pageId] ? '👁️ Visible' : '🚫 Caché'}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-600/30 rounded-xl">
+                <p className="text-yellow-500 text-xs font-bold uppercase tracking-widest">
+                  ⚠️ Les pages masquées disparaîtront du menu de navigation et seront inaccessibles même via URL. Les admins les verront toujours.
+                </p>
+              </div>
+            </div>
+
+            {/* BACKGROUND SECTION */}
+            <div className="max-w-2xl mx-auto">
             <form onSubmit={handleUpdateBackground} className="glass p-10 rounded-[3rem] border border-white/5">
               <div className="text-center mb-10">
                 <div className="w-16 h-16 bg-luxury-gold/10 rounded-2xl flex items-center justify-center mx-auto mb-6 text-luxury-gold">
@@ -656,6 +755,7 @@ const Admin: React.FC = () => {
                 </div>
               </div>
             </form>
+            </div>
           </div>
         )}
 

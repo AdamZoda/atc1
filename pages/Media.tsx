@@ -6,8 +6,17 @@ import { supabase } from '../supabaseClient';
 import { Post, Comment } from '../types';
 import { Play, Image as ImageIcon, FileText, Calendar, AlertCircle, Send, Trash2 } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
+import AccessControl from '../components/AccessControl';
 
 const Media: React.FC = () => {
+  return (
+    <AccessControl pageName="Gallery">
+      <MediaContent />
+    </AccessControl>
+  );
+};
+
+const MediaContent: React.FC = () => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [videoErrors, setVideoErrors] = useState<Record<number, boolean>>({});

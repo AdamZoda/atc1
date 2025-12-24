@@ -2,6 +2,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Car, Briefcase, Zap, Map, ShieldAlert, Heart, Wallet, Radio } from 'lucide-react';
+import AccessControl from '../components/AccessControl';
 
 const featuresList = [
   {
@@ -44,6 +45,7 @@ const featuresList = [
 
 const Features: React.FC = () => {
   return (
+    <AccessControl pageName="Features">
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -95,6 +97,7 @@ const Features: React.FC = () => {
         </div>
       </div>
     </motion.div>
+    </AccessControl>
   );
 };
 

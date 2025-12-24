@@ -2,17 +2,19 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { AlertCircle, Clock, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
+import AccessControl from '../components/AccessControl';
 
 const Shop: React.FC = () => {
   const { t } = useLanguage();
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="pt-32 pb-24 bg-luxury-dark min-h-screen"
-    >
+    <AccessControl pageName="Shop">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="pt-32 pb-24 bg-luxury-dark min-h-screen"
+      >
       <div className="max-w-7xl mx-auto px-6">
         {/* FLOATING UNAVAILABLE NOTIFICATION */}
         <motion.div
@@ -123,7 +125,8 @@ const Shop: React.FC = () => {
           </a>
         </motion.div>
       </div>
-    </motion.div>
+      </motion.div>
+    </AccessControl>
   );
 };
 
