@@ -21,5 +21,11 @@ export const siteConfig = {
   theme: {
     primaryColor: "#D4AF37",
     secondaryColor: "#8B0000",
+  },
+  music: {
+    defaultUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+    defaultName: "Musique du Serveur",
+    defaultVolume: 50,
+    isPlayingByDefault: false,
   }
 };

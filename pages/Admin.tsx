@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../supabaseClient';
 import { Profile, Post, RuleCategory, Rule } from '../types';
-import { Users, FilePlus, ShieldCheck, Trash2, Upload, Send, LayoutDashboard, Settings, Video, Image as ImageIcon, BookOpen, History, Activity, Ticket } from 'lucide-react';
+import { Users, FilePlus, ShieldCheck, Trash2, Upload, Send, LayoutDashboard, Settings, Video, Image as ImageIcon, BookOpen, History, Activity, Ticket, Music, Play, Pause } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import LocationDisplay from '../components/LocationDisplay';
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'posts' | 'config' | 'rules' | 'logs' | 'tickets'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'posts' | 'config' | 'rules' | 'logs' | 'tickets' | 'music'>('users');
   const [users, setUsers] = useState<Profile[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [categories, setCategories] = useState<RuleCategory[]>([]);
@@ -86,6 +86,18 @@ const Admin: React.FC = () => {
   const [adminReply, setAdminReply] = useState('');
   const [adminReplying, setAdminReplying] = useState(false);
 
+  // Music state
+  const [musicUrl, setMusicUrl] = useState('');
+  const [musicName, setMusicName] = useState('');
+  const [isPlayingMusic, setIsPlayingMusic] = useState(false);
+  const [musicVolume, setMusicVolume] = useState(50);
+  const [musicSubmitting, setMusicSubmitting] = useState(false);
+  const [musicFile, setMusicFile] = useState<File | null>(null);
+  const [musicUploading, setMusicUploading] = useState(false);
+  const [musicHistory, setMusicHistory] = useState<any[]>([]);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadTimeRemaining, setUploadTimeRemaining] = useState<string>('');
+
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -115,8 +127,26 @@ const Admin: React.FC = () => {
       fetchComments();
       fetchRoles();
       fetchTickets();
+      fetchMusicSettings();
+      fetchMusicHistory();
     });
   }, [navigate]);
+
+  const fetchMusicHistory = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('admin_logs')
+        .select('*')
+        .or('action_type.eq.music_upload,action_type.eq.music_toggle')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      if (data) setMusicHistory(data);
+    } catch (error: any) {
+      console.error('Erreur chargement historique musique:', error);
+    }
+  };
 
   const fetchRules = async () => {
     const { data: catData } = await supabase
@@ -1032,6 +1062,275 @@ const Admin: React.FC = () => {
     }
   };
 
+  const fetchMusicSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('site_music')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      if (data && data[0]) {
+        setMusicUrl(data[0].music_url);
+        setMusicName(data[0].music_name);
+        setIsPlayingMusic(data[0].is_playing);
+        setMusicVolume(data[0].volume);
+      }
+    } catch (error: any) {
+      console.error('❌ Erreur chargement musique:', error);
+    }
+  };
+
+  const updateMusicUrl = async (url: string, name: string) => {
+    if (!url.trim() || !name.trim()) {
+      alert('Veuillez remplir l\'URL et le nom de la musique');
+      return;
+    }
+
+    setMusicSubmitting(true);
+    try {
+      // Récupérer l'ID du premier enregistrement
+      const { data: existingData } = await supabase
+        .from('site_music')
+        .select('id')
+        .limit(1);
+
+      if (!existingData || !existingData[0]) {
+        alert('Erreur: Aucun enregistrement de musique trouvé');
+        setMusicSubmitting(false);
+        return;
+      }
+
+      const { error } = await supabase
+        .from('site_music')
+        .update({ music_url: url, music_name: name })
+        .eq('id', existingData[0].id);
+
+      if (error) throw error;
+
+      setMusicUrl(url);
+      setMusicName(name);
+      await logAdminAction('music_update', `🎵 Mise à jour de la musique: ${name}`, 'music', 'music');
+      alert('✅ Musique mise à jour!');
+    } catch (error: any) {
+      console.error('❌ Erreur mise à jour musique:', error);
+      alert(`Erreur: ${error.message}`);
+    } finally {
+      setMusicSubmitting(false);
+    }
+  };
+
+  const toggleMusicPlayback = async () => {
+    try {
+      // Récupérer l'ID du premier enregistrement
+      const { data: existingData } = await supabase
+        .from('site_music')
+        .select('id')
+        .limit(1);
+
+      if (!existingData || !existingData[0]) {
+        alert('Erreur: Aucun enregistrement de musique trouvé');
+        return;
+      }
+
+      const newPlayingState = !isPlayingMusic;
+      const { error } = await supabase
+        .from('site_music')
+        .update({ is_playing: newPlayingState })
+        .eq('id', existingData[0].id);
+
+      if (error) throw error;
+
+      setIsPlayingMusic(newPlayingState);
+      await logAdminAction('music_toggle', `🎵 Musique ${newPlayingState ? 'activée' : 'désactivée'}`, 'music', 'music');
+      alert(`✅ Musique ${newPlayingState ? 'lancée' : 'mise en pause'}!`);
+    } catch (error: any) {
+      console.error('❌ Erreur toggle musique:', error);
+      alert(`Erreur: ${error.message}`);
+    }
+  };
+
+  const uploadMusicFile = async () => {
+    if (!musicFile) {
+      alert('Veuillez sélectionner un fichier audio');
+      return;
+    }
+
+    if (!musicName.trim()) {
+      alert('Veuillez donner un nom à la musique');
+      return;
+    }
+
+    setMusicUploading(true);
+    setUploadProgress(0);
+    setUploadTimeRemaining('');
+
+    const fileSize = musicFile.size;
+    const fileSizeMB = (fileSize / (1024 * 1024)).toFixed(2);
+    const startTime = Date.now();
+
+    try {
+      // Créer un nom unique pour le fichier - NORMALISER pour éviter les erreurs de clé
+      const timestamp = Date.now();
+      // Enlever les accents et caractères spéciaux du nom original
+      const normalizedName = musicFile.name
+        .replace(/[àáâãäå]/g, 'a')
+        .replace(/[èéêë]/g, 'e')
+        .replace(/[ìíîï]/g, 'i')
+        .replace(/[òóôõö]/g, 'o')
+        .replace(/[ùúûü]/g, 'u')
+        .replace(/[ç]/g, 'c')
+        .replace(/[^a-z0-9.]/gi, '_')  // Remplacer les caractères spéciaux par _
+        .toLowerCase();
+      
+      const fileName = `music_${timestamp}_${normalizedName}`;
+
+      // Simuler une progression réelle basée sur la taille du fichier
+      // Calcul réaliste: ~1-5 MB/sec selon la connexion
+      const chunkSize = 1024 * 1024; // 1 MB chunks
+      const totalChunks = Math.ceil(fileSize / chunkSize);
+      let uploadedBytes = 0;
+
+      const progressInterval = setInterval(() => {
+        // Simuler l'upload graduel
+        uploadedBytes = Math.min(uploadedBytes + (Math.random() * fileSize * 0.15), fileSize * 0.95);
+        const progress = Math.floor((uploadedBytes / fileSize) * 100);
+        const uploadedMB = (uploadedBytes / (1024 * 1024)).toFixed(2);
+        
+        setUploadProgress(progress);
+
+        // Calculer le temps restant
+        const elapsedSeconds = (Date.now() - startTime) / 1000;
+        const bytesPerSecond = uploadedBytes / elapsedSeconds;
+        const remainingBytes = fileSize - uploadedBytes;
+        const remainingSeconds = Math.max(0, remainingBytes / bytesPerSecond);
+
+        if (remainingSeconds > 0) {
+          const minutes = Math.floor(remainingSeconds / 60);
+          const seconds = Math.floor(remainingSeconds % 60);
+          setUploadTimeRemaining(
+            minutes > 0 
+              ? `${minutes}m ${seconds}s` 
+              : `${seconds}s`
+          );
+        }
+      }, 300);
+
+      // Uploader le fichier dans Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase
+        .storage
+        .from('music')
+        .upload(fileName, musicFile, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      clearInterval(progressInterval);
+
+      if (uploadError) throw uploadError;
+
+      // Mettre à jour la progression à 100%
+      setUploadProgress(100);
+      setUploadTimeRemaining('Finalisation...');
+
+      // Récupérer l'URL publique du fichier
+      const { data: publicUrl } = supabase
+        .storage
+        .from('music')
+        .getPublicUrl(fileName);
+
+      console.log('✅ Fichier uploadé:', publicUrl.publicUrl);
+      
+      // ⚠️ VALIDATION: Vérifier que l'URL est bien de Supabase
+      if (!publicUrl.publicUrl.includes('supabase.co') || 
+          !publicUrl.publicUrl.includes('/storage/') ||
+          !publicUrl.publicUrl.includes('public/music/')) {
+        throw new Error('❌ URL de fichier invalide - non-Supabase');
+      }
+
+      // Mettre à jour la base de données avec la nouvelle URL
+      const { data: existingData } = await supabase
+        .from('site_music')
+        .select('id')
+        .limit(1);
+
+      if (!existingData || !existingData[0]) {
+        alert('Erreur: Aucun enregistrement de musique trouvé');
+        setMusicUploading(false);
+        setUploadProgress(0);
+        setUploadTimeRemaining('');
+        return;
+      }
+
+      const { error: updateError } = await supabase
+        .from('site_music')
+        .update({ 
+          music_url: publicUrl.publicUrl, 
+          music_name: musicName 
+        })
+        .eq('id', existingData[0].id);
+
+      if (updateError) throw updateError;
+
+      setMusicUrl(publicUrl.publicUrl);
+      setMusicFile(null);
+      await logAdminAction('music_upload', `🎵 Upload de musique: ${musicName}`, 'music', 'music');
+      
+      // Attendre un bit pour afficher 100%
+      setTimeout(() => {
+        setUploadProgress(0);
+        setUploadTimeRemaining('');
+        alert('✅ Musique uploadée avec succès!');
+      }, 500);
+    } catch (error: any) {
+      console.error('❌ Erreur upload:', error);
+      
+      // Afficher un message d'erreur clair
+      let errorMessage = error.message || 'Erreur inconnue';
+      
+      if (error.message?.includes('Bucket not found')) {
+        errorMessage = '❌ Le bucket "music" n\'existe pas dans Supabase Storage.\n\nSolution:\n1. Allez à: Supabase Dashboard → Storage\n2. Cliquez "New bucket"\n3. Nom: music\n4. Cochez "Public bucket"\n5. Créez le bucket';
+      } else if (error.message?.includes('Invalid key')) {
+        errorMessage = '❌ Le nom du fichier contient des caractères invalides.\n\nAssurez-vous que le nom contient uniquement des caractères simples (a-z, 0-9).';
+      }
+      
+      alert(`Erreur: ${errorMessage}`);
+      setUploadProgress(0);
+      setUploadTimeRemaining('');
+    } finally {
+      setMusicUploading(false);
+    }
+  };
+
+  const updateMusicVolume = async (newVolume: number) => {
+    try {
+      // Récupérer l'ID du premier enregistrement
+      const { data: existingData } = await supabase
+        .from('site_music')
+        .select('id')
+        .limit(1);
+
+      if (!existingData || !existingData[0]) {
+        console.error('Erreur: Aucun enregistrement de musique trouvé');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('site_music')
+        .update({ volume: newVolume })
+        .eq('id', existingData[0].id);
+
+      if (error) throw error;
+
+      setMusicVolume(newVolume);
+      await logAdminAction('music_volume', `🔊 Volume musique: ${newVolume}%`, 'music', 'music');
+    } catch (error: any) {
+      console.error('❌ Erreur volume musique:', error);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -1091,6 +1390,15 @@ const Admin: React.FC = () => {
               className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'tickets' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
             >
               <Ticket size={16} /> Tickets
+            </button>
+            <button 
+              onClick={() => {
+                setActiveTab('music');
+                fetchMusicSettings();
+              }}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'music' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
+            >
+              <Music size={16} /> Musique
             </button>
           </div>
         </header>
@@ -2202,6 +2510,171 @@ const Admin: React.FC = () => {
               )}
             </div>
           </div>
+        )}
+
+        {activeTab === 'music' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-6"
+          >
+            <h2 className="text-3xl font-bold text-luxury-gold">🎵 Gestion de la Musique</h2>
+
+            {/* Music Settings Form */}
+            <div className="glass p-8 rounded-3xl border border-white/10 space-y-4">
+              <h3 className="text-xl font-semibold text-luxury-gold uppercase tracking-widest">📤 Upload de Musique</h3>
+
+              {/* Music File Upload */}
+              <div>
+                <label className="block text-sm text-gray-300 mb-2 font-bold">Sélectionner un fichier audio</label>
+                <input
+                  type="file"
+                  accept="audio/mp3,audio/wav,audio/ogg,audio/flac,.mp3,.wav,.ogg,.flac"
+                  onChange={(e) => setMusicFile(e.target.files?.[0] || null)}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-luxury-gold/50 transition-all file:text-luxury-gold file:font-bold"
+                />
+                <p className="text-xs text-gray-400 mt-2">✓ Formats supportés: MP3, WAV, OGG, FLAC</p>
+                {musicFile && (
+                  <p className="text-xs text-luxury-gold mt-2">📁 Fichier sélectionné: {musicFile.name} ({(musicFile.size / 1024 / 1024).toFixed(2)} MB)</p>
+                )}
+              </div>
+
+              {/* Music Name Input */}
+              <div>
+                <label className="block text-sm text-gray-300 mb-2 font-bold">Nom de la Musique</label>
+                <input
+                  type="text"
+                  value={musicName}
+                  onChange={(e) => setMusicName(e.target.value)}
+                  placeholder="Ex: Atlantic RP - Ambiance"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-luxury-gold/50 focus:bg-white/10 transition-all"
+                />
+              </div>
+
+              {/* Upload Button */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={uploadMusicFile}
+                disabled={musicUploading || !musicFile || !musicName.trim()}
+                className="w-full bg-gradient-to-r from-green-600/80 to-green-500/60 hover:from-green-600 hover:to-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-all uppercase tracking-widest"
+              >
+                {musicUploading ? `⏳ ${uploadProgress}% - ${uploadTimeRemaining}` : '📤 Uploader la Musique'}
+              </motion.button>
+
+              {/* Upload Progress Bar */}
+              {musicUploading && (
+                <div className="space-y-3">
+                  <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden border border-white/20">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${uploadProgress}%` }}
+                      transition={{ duration: 0.3 }}
+                      className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full"
+                    />
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-gray-400">
+                      Progression: <span className="text-green-400 font-bold">{uploadProgress}%</span>
+                    </span>
+                    <span className="text-gray-400">
+                      Temps restant: <span className="text-green-400 font-bold">{uploadTimeRemaining || 'Calcul...'}</span>
+                    </span>
+                  </div>
+                  {musicFile && (
+                    <div className="text-xs text-gray-300 bg-black/30 rounded-lg p-2 font-mono">
+                      📊 <span className="text-green-400 font-bold">{Math.round(uploadProgress)}%</span> de {(musicFile.size / (1024 * 1024)).toFixed(2)} MB
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
+                <p className="text-sm text-green-400">
+                  ✅ <span className="font-bold">Recommandé:</span> Uploadez votre musique directement pour éviter les problèmes CORS!
+                </p>
+              </div>
+            </div>
+
+            {/* Music Controls */}
+            <div className="glass p-8 rounded-3xl border border-white/10">
+              <h3 className="text-xl font-semibold text-luxury-gold uppercase tracking-widest mb-6">🎛️ Contrôles</h3>
+
+              <div className="space-y-6">
+                {/* Play/Pause Button */}
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => toggleMusicPlayback()}
+                  disabled={musicSubmitting}
+                  className="w-full bg-gradient-to-r from-blue-600/80 to-blue-500/60 hover:from-blue-600 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-lg"
+                >
+                  {isPlayingMusic ? (
+                    <>
+                      <Pause size={24} />
+                      Mettre en Pause
+                    </>
+                  ) : (
+                    <>
+                      <Play size={24} />
+                      Lancer la Musique
+                    </>
+                  )}
+                </motion.button>
+
+                {/* Volume Control */}
+                <div className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">
+                  <label className="block text-sm text-gray-300 font-bold">Contrôle du Volume</label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={musicVolume}
+                    onChange={(e) => updateMusicVolume(parseInt(e.target.value))}
+                    className="w-full h-3 bg-white/10 rounded-lg appearance-none cursor-pointer accent-luxury-gold"
+                  />
+                  <div className="flex justify-between text-xs text-gray-400 font-bold">
+                    <span>🔇 Muet</span>
+                    <span className="text-luxury-gold">{musicVolume}%</span>
+                    <span>🔊 Max</span>
+                  </div>
+                </div>
+
+                {/* Info Message */}
+                <div className="p-4 bg-luxury-gold/10 border border-luxury-gold/30 rounded-lg">
+                  <p className="text-sm text-gray-300">
+                    💡 <span className="text-luxury-gold font-bold">Info:</span> Les visiteurs verront et entendront la musique, mais seuls les admins peuvent la contrôler.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Music History */}
+            <div className="glass p-8 rounded-3xl border border-white/10">
+              <h3 className="text-xl font-semibold text-luxury-gold uppercase tracking-widest mb-6">📜 Historique Musiques</h3>
+
+              {musicHistory.length === 0 ? (
+                <p className="text-gray-400 text-center py-6">Aucune musique jouée pour le moment</p>
+              ) : (
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {musicHistory.map((entry, idx) => (
+                    <div key={idx} className="p-4 bg-white/5 border border-white/10 rounded-lg flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-bold truncate">{entry.description}</p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {new Date(entry.created_at).toLocaleString('fr-FR')}
+                        </p>
+                      </div>
+                      <span className="text-luxury-gold text-sm font-bold ml-4 flex-shrink-0">
+                        {entry.action_type === 'music_upload' ? '📤' : '▶️'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
         )}
       </div>
     </motion.div>

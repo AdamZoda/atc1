@@ -6,6 +6,7 @@ import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { Profile, SiteSetting } from './types';
 import { LanguageProvider } from './LanguageContext';
 import { PageVisibilityProvider } from './PageVisibilityContext';
+import { MusicProvider } from './MusicContext';
 import { siteConfig } from './site-config';
 
 // Pages
@@ -28,6 +29,7 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import LocationPermission from './components/LocationPermission';
 import ConfigError from './components/ConfigError';
+import MusicPlayer from './components/MusicPlayer';
 
 const AppContent = () => {
   // Check if Supabase is properly configured
@@ -92,17 +94,15 @@ const AppContent = () => {
     fetchBackground();
   }, []);
 
-  // Auto-refresh pour les utilisateurs normaux (PAS LES ADMINS)
-  useEffect(() => {
-    if (profile && profile.role !== 'admin') {
-      // Refresh la page toutes les 60 secondes pour les utilisateurs normaux
-      const refreshInterval = setInterval(() => {
-        window.location.reload();
-      }, 60000); // 60 secondes (1 minute)
-
-      return () => clearInterval(refreshInterval);
-    }
-  }, [profile]);
+  // ❌ Auto-refresh DÉSACTIVÉ
+  // useEffect(() => {
+  //   if (profile && profile.role !== 'admin') {
+  //     const refreshInterval = setInterval(() => {
+  //       window.location.reload();
+  //     }, 60000);
+  //     return () => clearInterval(refreshInterval);
+  //   }
+  // }, [profile]);
 
   const fetchProfile = async (userId: string) => {
     const { data, error } = await supabase
@@ -221,6 +221,7 @@ const AppContent = () => {
           </AnimatePresence>
         </main>
         <Footer />
+        <MusicPlayer />
       </div>
     </div>
   );
@@ -230,9 +231,12 @@ const App = () => {
   return (
     <LanguageProvider>
       <PageVisibilityProvider>
-        <Router>
-          <AppContent />
-        </Router>
+        <MusicProvider>
+          <Router>
+            <AppContent />
+            <MusicPlayer />
+          </Router>
+        </MusicProvider>
       </PageVisibilityProvider>
     </LanguageProvider>
   );
