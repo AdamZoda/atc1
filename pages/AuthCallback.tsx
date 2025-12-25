@@ -68,13 +68,21 @@ const AuthCallback: React.FC = () => {
       const finalDisplayName = existingProfile?.display_name || identityDisplayName;
       const finalAvatar = existingProfile?.avatar_url || identityAvatar || null;
 
-      console.log('💾 Données à upsert:', { id: user.id, username: finalUsername, display_name: finalDisplayName, avatar_url: finalAvatar });
+      // Extract Discord provider_id from identities
+      let providerId: string | null = null;
+      const discordIdentity = (user.identities || []).find((i: any) => i.provider === 'discord');
+      if (discordIdentity && discordIdentity.identity_data) {
+        providerId = discordIdentity.identity_data.id;
+      }
+
+      console.log('💾 Données à upsert:', { id: user.id, username: finalUsername, display_name: finalDisplayName, avatar_url: finalAvatar, provider_id: providerId });
 
       const { data: upsertData, error: upsertError } = await supabase.from('profiles').upsert({ 
         id: user.id, 
         username: finalUsername, 
         avatar_url: finalAvatar, 
-        display_name: finalDisplayName 
+        display_name: finalDisplayName,
+        provider_id: providerId
       });
       
       if (upsertError) {

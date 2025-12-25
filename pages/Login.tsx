@@ -61,7 +61,7 @@ const Login: React.FC = () => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen flex items-center justify-center bg-luxury-dark px-6 py-20 relative overflow-hidden"
+      className="min-h-screen flex items-center justify-center bg-luxury-dark px-6 py-20 pt-28 md:pt-32 lg:pt-36 relative overflow-hidden"
     >
       <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_right,_rgba(212,175,55,0.05),_transparent_40%)]"></div>
       

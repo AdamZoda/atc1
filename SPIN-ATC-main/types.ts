@@ -15,6 +15,7 @@ export interface User {
 export interface Winner {
   userId: string;
   userName: string;
+  displayName?: string;
   date: number;
   prize?: string;
 }

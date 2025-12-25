@@ -3,13 +3,36 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../supabaseClient';
 import { Profile, Post, RuleCategory, Rule } from '../types';
-import { Users, FilePlus, ShieldCheck, Trash2, Upload, Send, LayoutDashboard, Settings, Video, Image as ImageIcon, BookOpen, History, Activity, Ticket, Music, Play, Pause } from 'lucide-react';
+import { Users, FilePlus, ShieldCheck, Trash2, Upload, Send, LayoutDashboard, Settings, Video, Image as ImageIcon, BookOpen, History, Activity, Ticket, Music, Play, Pause, Copy, Check } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import LocationDisplay from '../components/LocationDisplay';
 
 // Fonction silencieuse pour afficher une notification sans alerte
 const showToast = (message: string) => {
   console.log('ℹ️', message);
+};
+
+// Composant pour copier le Discord ID au format <@id>
+const CopyProviderIdButton: React.FC<{ providerId: string }> = ({ providerId }) => {
+  const handleCopy = async () => {
+    try {
+      const formattedId = `<@${providerId}>`;
+      await navigator.clipboard.writeText(formattedId);
+      console.log(`✅ Discord ID copié: ${formattedId}`);
+    } catch (err) {
+      console.error('❌ Erreur lors de la copie:', err);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="p-2 rounded-lg hover:bg-indigo-500/30 transition-all duration-200 text-indigo-400 hover:text-indigo-300"
+      title={`Copier: <@${providerId}>`}
+    >
+      <Copy size={20} />
+    </button>
+  );
 };
 
 const Admin: React.FC = () => {
@@ -179,7 +202,7 @@ const Admin: React.FC = () => {
 
   const fetchUsers = async () => {
     try {
-      // Récupérer les profils
+      // Récupérer les profils avec TOUS les champs incluant provider_id
       const { data: profiles, error } = await supabase
         .from('profiles')
         .select('*');
@@ -191,6 +214,11 @@ const Admin: React.FC = () => {
       }
 
       if (profiles) {
+        // Debug: afficher les données récupérées
+        console.log('📥 Profils chargés:', profiles);
+        profiles.forEach((p: any) => {
+          console.log(`  👤 ${p.username}: provider_id = ${p.provider_id || 'NULL'}`);
+        });
         setUsers(profiles);
       }
       setLoading(false);
@@ -1146,16 +1174,21 @@ const Admin: React.FC = () => {
         return;
       }
 
+      const recordId = existingData[0].id;
       const { error } = await supabase
         .from('site_music')
         .update({ music_url: url, music_name: name })
-        .eq('id', existingData[0].id);
+        .eq('id', recordId);
 
       if (error) throw error;
 
       setMusicUrl(url);
       setMusicName(name);
-      await logAdminAction('music_update', `🎵 Mise à jour de la musique: ${name}`, 'music', 'music');
+      await logAdminAction('music_update', `🎵 Mise à jour: ${name}`, 'music', name, { 
+        musicUrl: url, 
+        musicName: name,
+        fileName: url.split('/').pop() 
+      });
       console.log('✅ Musique mise à jour!');
     } catch (error: any) {
       console.error('❌ Erreur mise à jour musique:', error);
@@ -1167,10 +1200,10 @@ const Admin: React.FC = () => {
 
   const toggleMusicPlayback = async () => {
     try {
-      // Récupérer l'ID du premier enregistrement
+      // Récupérer l'ID et infos du premier enregistrement
       const { data: existingData } = await supabase
         .from('site_music')
-        .select('id')
+        .select('id, music_url, music_name')
         .limit(1);
 
       if (!existingData || !existingData[0]) {
@@ -1179,15 +1212,20 @@ const Admin: React.FC = () => {
       }
 
       const newPlayingState = !isPlayingMusic;
+      const recordId = existingData[0].id;
       const { error } = await supabase
         .from('site_music')
         .update({ is_playing: newPlayingState })
-        .eq('id', existingData[0].id);
+        .eq('id', recordId);
 
       if (error) throw error;
 
       setIsPlayingMusic(newPlayingState);
-      await logAdminAction('music_toggle', `🎵 Musique ${newPlayingState ? 'activée' : 'désactivée'}`, 'music', 'music');
+      await logAdminAction('music_toggle', `🎵 Musique ${newPlayingState ? 'activée' : 'désactivée'}`, 'music', existingData[0].music_name, { 
+        musicUrl: existingData[0].music_url, 
+        musicName: existingData[0].music_name,
+        fileName: existingData[0].music_url?.split('/').pop() 
+      });
       console.log(`✅ Musique ${newPlayingState ? 'lancée' : 'mise en pause'}!`);
     } catch (error: any) {
       console.error('❌ Erreur toggle musique:', error);
@@ -1319,7 +1357,11 @@ const Admin: React.FC = () => {
 
       setMusicUrl(publicUrl.publicUrl);
       setMusicFile(null);
-      await logAdminAction('music_upload', `🎵 Upload de musique: ${musicName}`, 'music', 'music');
+      await logAdminAction('music_upload', `🎵 Upload de musique: ${musicName}`, 'music', musicName, { 
+        musicUrl: publicUrl.publicUrl, 
+        musicName: musicName,
+        fileName: publicUrl.publicUrl.split('/').pop()
+      });
       
       // Attendre un bit pour afficher 100%
       setTimeout(() => {
@@ -1360,10 +1402,11 @@ const Admin: React.FC = () => {
         return;
       }
 
+      const recordId = existingData[0].id;
       const { error } = await supabase
         .from('site_music')
         .update({ volume: newVolume })
-        .eq('id', existingData[0].id);
+        .eq('id', recordId);
 
       if (error) throw error;
 
@@ -1379,7 +1422,7 @@ const Admin: React.FC = () => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="pt-32 pb-24 bg-luxury-dark min-h-screen"
+      className="pt-28 md:pt-32 lg:pt-36 pb-24 bg-luxury-dark min-h-screen"
     >
       <div className="w-full mx-auto px-16 max-w-screen-2xl">
         <header className="mb-12 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -1634,17 +1677,7 @@ const Admin: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 text-center">
                       {user.provider_id ? (
-                        <button
-                          onClick={() => {
-                            const formattedId = `<@${user.provider_id}>`;
-                            navigator.clipboard.writeText(formattedId);
-                            console.log(`✅ Discord ID copié: ${formattedId}`);
-                          }}
-                          className="px-3 py-2 rounded-lg bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/40 transition-all text-xs font-bold uppercase tracking-widest"
-                          title={`Discord ID: <@${user.provider_id}>`}
-                        >
-                          📋 Copier ID
-                        </button>
+                        <CopyProviderIdButton providerId={user.provider_id} />
                       ) : (
                         <span className="px-3 py-2 rounded-lg bg-gray-500/10 text-gray-500 text-xs font-bold uppercase tracking-widest inline-block cursor-not-allowed">
                           ❌ Pas Discord
@@ -2785,76 +2818,102 @@ const Admin: React.FC = () => {
             <h2 className="text-3xl font-bold text-luxury-gold">🎵 Gestion de la Musique</h2>
 
             {/* Music Settings Form */}
-            <div className="glass p-8 rounded-3xl border border-white/10 space-y-4">
+            <div className="glass p-8 rounded-3xl border border-white/10 space-y-6">
               <h3 className="text-xl font-semibold text-luxury-gold uppercase tracking-widest">📤 Upload de Musique</h3>
 
               {/* Music File Upload */}
               <div>
-                <label className="block text-sm text-gray-300 mb-2 font-bold">Sélectionner un fichier audio</label>
-                <input
-                  type="file"
-                  accept="audio/mp3,audio/wav,audio/ogg,audio/flac,.mp3,.wav,.ogg,.flac"
-                  onChange={(e) => setMusicFile(e.target.files?.[0] || null)}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-luxury-gold/50 transition-all file:text-luxury-gold file:font-bold"
-                />
-                <p className="text-xs text-gray-400 mt-2">✓ Formats supportés: MP3, WAV, OGG, FLAC</p>
+                <label className="block text-sm text-gray-300 mb-4 font-bold">Sélectionner un fichier audio</label>
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept="audio/mp3,audio/wav,audio/ogg,audio/flac,.mp3,.wav,.ogg,.flac"
+                    onChange={(e) => setMusicFile(e.target.files?.[0] || null)}
+                    className="hidden"
+                    id="music-file-input"
+                  />
+                  <label
+                    htmlFor="music-file-input"
+                    className="block w-full bg-gradient-to-br from-purple-600/40 to-indigo-600/40 hover:from-purple-600/60 hover:to-indigo-600/60 border-2 border-dashed border-purple-400/50 hover:border-purple-400 rounded-2xl px-6 py-8 text-center cursor-pointer transition-all duration-300 group"
+                  >
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <div className="text-4xl group-hover:scale-110 transition-transform duration-300">🎵</div>
+                      <div>
+                        <p className="text-white font-bold text-lg">Choisir un fichier</p>
+                        <p className="text-purple-300 text-sm mt-1">ou glisser-déposer</p>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-2">MP3 • WAV • OGG • FLAC</p>
+                    </div>
+                  </label>
+                </div>
                 {musicFile && (
-                  <p className="text-xs text-luxury-gold mt-2">📁 Fichier sélectionné: {musicFile.name} ({(musicFile.size / 1024 / 1024).toFixed(2)} MB)</p>
+                  <div className="mt-4 p-3 bg-purple-500/20 border border-purple-400/50 rounded-lg">
+                    <p className="text-sm text-purple-300">✅ <span className="font-bold">{musicFile.name}</span></p>
+                    <p className="text-xs text-gray-400 mt-1">📊 {(musicFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                  </div>
                 )}
               </div>
 
               {/* Music Name Input */}
               <div>
-                <label className="block text-sm text-gray-300 mb-2 font-bold">Nom de la Musique</label>
+                <label className="block text-sm text-gray-300 mb-3 font-bold">Nom de la Musique</label>
                 <input
                   type="text"
                   value={musicName}
                   onChange={(e) => setMusicName(e.target.value)}
                   placeholder="Ex: Atlantic RP - Ambiance"
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-luxury-gold/50 focus:bg-white/10 transition-all"
+                  className="w-full bg-gradient-to-r from-white/5 to-white/10 border border-purple-400/30 hover:border-purple-400/50 focus:border-purple-400 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:bg-white/15 focus:ring-2 focus:ring-purple-500/30 transition-all"
                 />
               </div>
 
               {/* Upload Button */}
               <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
                 onClick={uploadMusicFile}
                 disabled={musicUploading || !musicFile || !musicName.trim()}
-                className="w-full bg-gradient-to-r from-green-600/80 to-green-500/60 hover:from-green-600 hover:to-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-all uppercase tracking-widest"
+                className="w-full bg-gradient-to-r from-emerald-600 via-emerald-500 to-green-500 hover:from-emerald-500 hover:via-emerald-400 hover:to-green-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition-all uppercase tracking-widest shadow-lg hover:shadow-emerald-500/50 border border-emerald-400/30 text-lg"
               >
-                {musicUploading ? `⏳ ${uploadProgress}% - ${uploadTimeRemaining}` : '📤 Uploader la Musique'}
+                {musicUploading ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="animate-spin">⏳</div>
+                    <span>{uploadProgress}% - {uploadTimeRemaining}</span>
+                  </div>
+                ) : (
+                  '📤 Uploader la Musique'
+                )}
               </motion.button>
 
               {/* Upload Progress Bar */}
               {musicUploading && (
-                <div className="space-y-3">
-                  <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden border border-white/20">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${uploadProgress}%` }}
-                      transition={{ duration: 0.3 }}
-                      className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full"
-                    />
-                  </div>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-gray-400">
-                      Progression: <span className="text-green-400 font-bold">{uploadProgress}%</span>
-                    </span>
-                    <span className="text-gray-400">
-                      Temps restant: <span className="text-green-400 font-bold">{uploadTimeRemaining || 'Calcul...'}</span>
-                    </span>
-                  </div>
-                  {musicFile && (
-                    <div className="text-xs text-gray-300 bg-black/30 rounded-lg p-2 font-mono">
-                      📊 <span className="text-green-400 font-bold">{Math.round(uploadProgress)}%</span> de {(musicFile.size / (1024 * 1024)).toFixed(2)} MB
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-300 font-semibold">Progression</span>
+                      <span className="text-sm font-bold text-emerald-400">{uploadProgress}%</span>
                     </div>
-                  )}
+                    <div className="w-full h-4 bg-white/10 rounded-full overflow-hidden border border-emerald-400/30">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${uploadProgress}%` }}
+                        transition={{ duration: 0.3 }}
+                        className="h-full bg-gradient-to-r from-emerald-500 via-green-400 to-emerald-400 rounded-full shadow-lg shadow-emerald-500/50"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center text-xs bg-black/20 rounded-lg p-3">
+                    <span className="text-gray-300">
+                      ⏱️ Temps restant: <span className="text-emerald-400 font-bold">{uploadTimeRemaining || 'Calcul...'}</span>
+                    </span>
+                    {musicFile && (
+                      <span className="text-gray-300">
+                        📊 <span className="text-emerald-400 font-bold">{(musicFile.size / (1024 * 1024)).toFixed(2)} MB</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
               )}
 
-              <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
-                <p className="text-sm text-green-400">
+              <div className="p-4 bg-emerald-500/15 border border-emerald-500/40 rounded-lg">
+                <p className="text-sm text-emerald-300">
                   ✅ <span className="font-bold">Recommandé:</span> Uploadez votre musique directement pour éviter les problèmes CORS!
                 </p>
               </div>
@@ -2922,16 +2981,54 @@ const Admin: React.FC = () => {
               ) : (
                 <div className="space-y-3 max-h-96 overflow-y-auto">
                   {musicHistory.map((entry, idx) => (
-                    <div key={idx} className="p-4 bg-white/5 border border-white/10 rounded-lg flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white font-bold truncate">{entry.description}</p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          {new Date(entry.created_at).toLocaleString('fr-FR')}
-                        </p>
+                    <div key={idx} className="p-4 bg-white/5 border border-white/10 rounded-lg hover:border-luxury-gold/30 transition-all">
+                      <div className="flex items-start justify-between gap-4 mb-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-luxury-gold text-lg">
+                              {entry.action_type === 'music_upload' ? '📤' : '▶️'}
+                            </span>
+                            <p className="text-white font-bold text-sm">
+                              {entry.details?.musicName || entry.action_description}
+                            </p>
+                          </div>
+                          {entry.details?.musicUrl && (
+                            <p className="text-xs text-gray-400 truncate">
+                              📁 {entry.details.musicUrl.split('/').pop()}
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-500 mt-2">
+                            🕐 {new Date(entry.created_at).toLocaleString('fr-FR')}
+                          </p>
+                        </div>
                       </div>
-                      <span className="text-luxury-gold text-sm font-bold ml-4 flex-shrink-0">
-                        {entry.action_type === 'music_upload' ? '📤' : '▶️'}
-                      </span>
+                      
+                      {entry.details?.musicUrl && (
+                        <div className="flex gap-2 flex-wrap">
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(entry.details.musicUrl);
+                              console.log(`✅ URL copiée`);
+                            }}
+                            className="px-2 py-1 rounded bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/40 transition-all text-xs font-bold uppercase tracking-widest"
+                            title="Copier l'URL"
+                          >
+                            📋 Copier URL
+                          </button>
+                          <button
+                            onClick={async () => {
+                              setMusicUrl(entry.details.musicUrl);
+                              setMusicName(entry.details.musicName || 'Musique');
+                              await updateMusicUrl(entry.details.musicUrl, entry.details.musicName || 'Musique');
+                              console.log(`▶️ Lancement: ${entry.details.musicName}`);
+                            }}
+                            className="px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 transition-all text-xs font-bold uppercase tracking-widest"
+                            title="Lancer cette musique"
+                          >
+                            ▶️ Lancer
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

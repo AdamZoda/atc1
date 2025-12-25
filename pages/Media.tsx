@@ -86,10 +86,10 @@ const MediaContent: React.FC = () => {
         data.map(async (comment: any) => {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('username, avatar_url')
+            .select('username, display_name, avatar_url')
             .eq('id', comment.user_id)
             .single();
-          return { ...comment, username: profile?.username || 'Anonymous', avatar_url: profile?.avatar_url || DEFAULT_AVATAR };
+          return { ...comment, username: profile?.display_name || profile?.username || 'Anonymous', avatar_url: profile?.avatar_url || DEFAULT_AVATAR };
         })
       );
       setComments(commentsWithUsernames);
@@ -130,7 +130,7 @@ const MediaContent: React.FC = () => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="pt-32 pb-24 bg-luxury-dark min-h-screen"
+      className="pt-28 md:pt-32 lg:pt-36 pb-24 bg-luxury-dark min-h-screen"
     >
       <div className="max-w-7xl mx-auto px-6">
         <header className="mb-16">

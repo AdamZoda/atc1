@@ -38,7 +38,7 @@ const About: React.FC = () => {
         // Récupérer le profil de l'utilisateur
         const { data: profile } = await supabase
           .from('profiles')
-          .select('username')
+          .select('username, display_name')
           .eq('id', session.user.id)
           .single();
         
@@ -58,7 +58,7 @@ const About: React.FC = () => {
       if (session) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('username')
+          .select('username, display_name')
           .eq('id', session.user.id)
           .single();
         
@@ -89,8 +89,40 @@ const About: React.FC = () => {
       if (error) {
         console.error('❌ Erreur chargement commentaires:', error);
       } else {
-        setComments(data || []);
-        console.log('✅ Commentaires chargés:', data?.length);
+        // Enrichir les commentaires avec display_name et avatar depuis les profils si nécessaire
+        const enrichedComments = await Promise.all(
+          (data || []).map(async (comment: any) => {
+            // Si display_name est vide ou pas défini, chercher le vrai nom et avatar
+            if (!comment.display_name || comment.display_name.trim() === '' || !comment.avatar_url) {
+              try {
+                let displayName = null;
+                let avatarUrl = null;
+                
+                // Si on a user_id, chercher dans profiles
+                if (comment.user_id) {
+                  const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('display_name, username, avatar_url')
+                    .eq('id', comment.user_id)
+                    .single();
+                  displayName = profile?.display_name || profile?.username;
+                  avatarUrl = profile?.avatar_url;
+                }
+                
+                return {
+                  ...comment,
+                  display_name: displayName || comment.display_name || comment.username || 'Utilisateur',
+                  avatar_url: avatarUrl || comment.avatar_url || null
+                };
+              } catch (err) {
+                console.error('Erreur enrichissement:', err);
+              }
+            }
+            return comment;
+          })
+        );
+        setComments(enrichedComments);
+        console.log('✅ Commentaires chargés:', enrichedComments?.length);
       }
     } catch (err: any) {
       console.error('❌ Erreur:', err.message);
@@ -138,7 +170,10 @@ const About: React.FC = () => {
       const { data, error } = await supabase
         .from('about_comments')
         .insert([{
+          user_id: session.user.id,
           username: userProfile?.username || 'Anonyme',
+          display_name: userProfile?.display_name || userProfile?.username || 'Utilisateur',
+          avatar_url: userProfile?.avatar_url || null,
           message: commentMessage,
           approved: true // Approbation automatique pour maintenant
         }])
@@ -313,7 +348,7 @@ const About: React.FC = () => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="relative min-h-screen pt-20"
+      className="relative min-h-screen pt-28 md:pt-32 lg:pt-36"
     >
       {/* HEADER SECTION */}
       <div className="relative py-20 px-4 sm:px-6 lg:px-8">
@@ -798,7 +833,7 @@ const About: React.FC = () => {
             <form onSubmit={handleSubmitComment} className="space-y-4 mb-8">
               <div className="p-4 rounded-lg bg-black/50 border border-white/10">
                 <p className="text-luxury-gold font-bold text-sm mb-1">Votre pseudo:</p>
-                <p className="text-white">{userProfile?.username || session?.user?.email || 'Utilisateur'}</p>
+                <p className="text-white">{userProfile?.display_name || userProfile?.username || 'Utilisateur'}</p>
               </div>
               <textarea
                 placeholder="Votre message..."
@@ -839,9 +874,22 @@ const About: React.FC = () => {
                   className="p-4 rounded-lg bg-black/50 border border-white/10 hover:border-luxury-gold/30 transition-all"
                 >
                   <div className="flex items-start justify-between gap-3 mb-2">
-                    <h4 className="font-bold text-luxury-gold text-sm uppercase tracking-widest">
-                      👤 {comment.username}
-                    </h4>
+                    <div className="flex items-center gap-3">
+                      {comment.avatar_url ? (
+                        <img 
+                          src={comment.avatar_url} 
+                          alt={comment.display_name || comment.username}
+                          className="w-10 h-10 rounded-full object-cover border border-luxury-gold/30 flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-luxury-gold/20 flex items-center justify-center text-luxury-gold font-bold flex-shrink-0">
+                          {(comment.display_name || comment.username || 'U').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <h4 className="font-bold text-luxury-gold text-sm uppercase tracking-widest">
+                        {comment.display_name || comment.username}
+                      </h4>
+                    </div>
                     <span className="text-xs text-gray-500">
                       ⏰ {new Date(comment.created_at).toLocaleString('fr-FR', {
                         year: 'numeric',

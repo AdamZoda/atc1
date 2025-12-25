@@ -80,7 +80,7 @@ const Rules: React.FC = () => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="pt-32 pb-24 bg-luxury-dark min-h-screen"
+      className="pt-28 md:pt-32 lg:pt-36 pb-24 bg-luxury-dark min-h-screen"
     >
       <div className="max-w-5xl mx-auto px-6">
         <header className="text-center mb-16">

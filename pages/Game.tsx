@@ -223,9 +223,9 @@ const GamePage: React.FC<{ profile: Profile | null }> = ({ profile }) => {
         setCurrentRound(roundData);
       }
 
-      // Fetch participants
+      // Fetch participants (using secure view with display_name)
       const { data: participantsData } = await supabase
-        .from('game_participants')
+        .from('game_participants_with_names')
         .select('*')
         .eq('game_round', roundData?.id)
         .order('created_at', { ascending: false });
@@ -239,9 +239,9 @@ const GamePage: React.FC<{ profile: Profile | null }> = ({ profile }) => {
         }
       }
 
-      // Fetch winners
+      // Fetch winners (using secure view with display_name)
       const { data: winnersData } = await supabase
-        .from('game_winners')
+        .from('game_winners_with_names')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(10);
@@ -250,9 +250,9 @@ const GamePage: React.FC<{ profile: Profile | null }> = ({ profile }) => {
         setWinners(winnersData);
       }
 
-      // Fetch chat messages
+      // Fetch chat messages (using secure view with display_name)
       const { data: chatData } = await supabase
-        .from('game_chat_messages')
+        .from('game_chat_messages_with_names')
         .select('*')
         .eq('is_visible', true)
         .order('created_at', { ascending: false })
@@ -823,7 +823,7 @@ const GamePage: React.FC<{ profile: Profile | null }> = ({ profile }) => {
   }
 
   return (
-    <div className="min-h-screen bg-luxury-dark pt-24 pb-12 px-4">
+    <div className="min-h-screen bg-luxury-dark pt-28 md:pt-32 lg:pt-36 pb-12 px-4">
       <div className="max-w-7xl mx-auto">
         {/* Page Visibility Check */}
         {!pageVisible && !isAdmin && (

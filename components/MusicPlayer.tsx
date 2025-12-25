@@ -49,20 +49,23 @@ const MusicPlayer: React.FC = () => {
   useEffect(() => {
     if (!audioRef.current || isLoadingUrl) return;
 
-    if (isPlaying && musicUrl) {
-      console.log('▶️ Tentative de lecture...');
-      audioRef.current.play()
-        .then(() => {
-          console.log('✅ Lecture réussie');
-          setIsAudioPlaying(true);
-        })
-        .catch((err) => {
-          console.error('❌ Erreur lecture:', err);
-        });
-    } else {
-      audioRef.current.pause();
-      setIsAudioPlaying(false);
-    }
+    // Petit délai pour éviter les race conditions
+    const playAudio = async () => {
+      try {
+        if (isPlaying && musicUrl) {
+          await audioRef.current!.play();
+        } else {
+          audioRef.current!.pause();
+        }
+      } catch (err: any) {
+        // Ignorer les erreurs AbortError (réseau, etc)
+        if (err.name !== 'AbortError') {
+          console.error('❌ Erreur audio:', err);
+        }
+      }
+    };
+
+    playAudio();
   }, [isPlaying, musicUrl, isLoadingUrl]);
 
   // Mettre à jour le volume
@@ -73,19 +76,8 @@ const MusicPlayer: React.FC = () => {
   }, [localVolume]);
 
   const handlePlayPause = () => {
-    if (!audioRef.current) return;
-    
-    // Contrôle IMMÉDIAT de l'audio HTML
-    if (audioRef.current.paused) {
-      audioRef.current.play()
-        .then(() => setIsAudioPlaying(true))
-        .catch((err) => console.error('Erreur play:', err));
-    } else {
-      audioRef.current.pause();
-      setIsAudioPlaying(false);
-    }
-    
-    // Synchronise aussi avec la BD pour les autres utilisateurs
+    // Juste appeler la fonction du contexte
+    // L'effet useEffect gérera le play/pause automatiquement
     togglePlayPause();
   };
 

@@ -244,7 +244,6 @@ const App = () => {
         <MusicProvider>
           <Router>
             <AppContent />
-            <MusicPlayer />
           </Router>
         </MusicProvider>
       </PageVisibilityProvider>

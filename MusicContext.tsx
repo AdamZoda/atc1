@@ -19,30 +19,21 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [musicName, setMusicName] = useState('Musique du Serveur');
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(20);
+  const [isUpdatingLocally, setIsUpdatingLocally] = useState(false); // Flag pour éviter les recharges en conflit
 
   // Charger la musique depuis la base de données au démarrage UNIQUEMENT
   useEffect(() => {
     fetchMusic();
     
-    // S'abonner aux changements en temps réel
-    const subscription = supabase
-      .channel('site_music_changes')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'site_music' },
-        (payload) => {
-          console.log('🔄 Changement de musique détecté:', payload);
-          fetchMusic();
-        }
-      )
-      .subscribe();
+    // Polling simple chaque 5 secondes pour détecter les changements d'URL (pas le play/pause)
+    const pollInterval = setInterval(() => {
+      if (!isUpdatingLocally) {
+        fetchMusicUrlOnly(); // Seulement vérifier l'URL, pas le play/pause
+      }
+    }, 5000);
 
-    // ✅ SUPPRIMÉ: Le refresh toutes les 5 secondes qui causait les duplications
-    // Plus de setInterval qui recharge constamment la musique!
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
+    return () => clearInterval(pollInterval);
+  }, [isUpdatingLocally]);
 
   const fetchMusic = async () => {
     try {
@@ -55,26 +46,16 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (error) throw error;
 
       if (data && data[0]) {
-        console.log('🎵 Données musique chargées:', {
-          url: data[0].music_url,
-          name: data[0].music_name,
-          isPlaying: data[0].is_playing,
-          volume: data[0].volume
-        });
-        
         // ⚠️ VALIDATION STRICTE: ACCEPTER UNIQUEMENT Supabase Storage
-        // Bloquer soundhelix, youtube, spotify, et TOUTE URL externe
         let validUrl: string | null = null;
         
         if (data[0].music_url && typeof data[0].music_url === 'string') {
-          // Vérifier que c'est une URL Supabase Storage
           if (data[0].music_url.includes('supabase.co') && 
               data[0].music_url.includes('/storage/') &&
               data[0].music_url.includes('public/music/')) {
             validUrl = data[0].music_url;
-            console.log('✅ URL Supabase acceptée');
           } else {
-            console.warn('❌ URL BLOQUÉE (non-Supabase):', data[0].music_url);
+            console.warn('⚠️ URL non-Supabase bloquée');
           }
         }
         
@@ -84,7 +65,37 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setVolume(data[0].volume);
       }
     } catch (error: any) {
-      console.error('❌ Erreur chargement musique:', error);
+      console.error('❌ Erreur chargement musique');
+    }
+  };
+
+  // Charger SEULEMENT l'URL et le nom (pas le play/pause)
+  const fetchMusicUrlOnly = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('site_music')
+        .select('music_url, music_name')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      if (data && data[0]) {
+        let validUrl: string | null = null;
+        
+        if (data[0].music_url && typeof data[0].music_url === 'string') {
+          if (data[0].music_url.includes('supabase.co') && 
+              data[0].music_url.includes('/storage/') &&
+              data[0].music_url.includes('public/music/')) {
+            validUrl = data[0].music_url;
+          }
+        }
+        
+        setMusicUrl(validUrl);
+        setMusicName(data[0].music_name);
+      }
+    } catch (error: any) {
+      console.error('❌ Erreur chargement URL musique');
     }
   };
 
@@ -94,32 +105,70 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const togglePlayPause = async () => {
     try {
+      // ✅ OPTIMISME: Inverser l'état immédiatement
       const newPlayState = !isPlaying;
+      setIsPlaying(newPlayState);
+      
+      // Flag pour 2 secondes : ignorer tous les recharges de la BD
+      setIsUpdatingLocally(true);
+      setTimeout(() => setIsUpdatingLocally(false), 2000);
+
+      // Récupérer l'ID du premier enregistrement
+      const { data: musicData } = await supabase
+        .from('site_music')
+        .select('id')
+        .limit(1);
+
+      if (!musicData || !musicData[0]) {
+        console.log('Aucun enregistrement de musique trouvé');
+        setIsPlaying(!newPlayState);
+        return;
+      }
+
+      const recordId = musicData[0].id;
       const { error } = await supabase
         .from('site_music')
         .update({ is_playing: newPlayState })
-        .neq('id', '');
+        .eq('id', recordId);
 
-      if (error) throw error;
-      await fetchMusic();
-      console.log(`🎵 Musique ${newPlayState ? 'en lecture' : 'en pause'}`);
+      if (error) {
+        setIsPlaying(!newPlayState);
+        throw error;
+      }
     } catch (error: any) {
-      console.error('❌ Erreur toggle play/pause:', error);
+      console.error('❌ Erreur toggle play/pause');
     }
   };
 
   const updateVolume = async (newVolume: number) => {
     try {
+      // ✅ OPTIMISME: Mettre à jour le volume immédiatement
+      setVolume(newVolume);
+      
+      // Flag pour 2 secondes : ignorer les recharges
+      setIsUpdatingLocally(true);
+      setTimeout(() => setIsUpdatingLocally(false), 2000);
+
+      // Récupérer l'ID du premier enregistrement
+      const { data: musicData } = await supabase
+        .from('site_music')
+        .select('id')
+        .limit(1);
+
+      if (!musicData || !musicData[0]) {
+        console.log('Aucun enregistrement de musique trouvé');
+        return;
+      }
+
+      const recordId = musicData[0].id;
       const { error } = await supabase
         .from('site_music')
         .update({ volume: newVolume })
-        .neq('id', '');
+        .eq('id', recordId);
 
       if (error) throw error;
-      setVolume(newVolume);
-      console.log(`🔊 Volume: ${newVolume}%`);
     } catch (error: any) {
-      console.error('❌ Erreur mise à jour volume:', error);
+      console.error('❌ Erreur mise à jour volume');
     }
   };
 
