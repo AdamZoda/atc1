@@ -30,6 +30,7 @@ import Footer from './components/Footer';
 import LocationPermission from './components/LocationPermission';
 import ConfigError from './components/ConfigError';
 import MusicPlayer from './components/MusicPlayer';
+import BannedScreen from './components/BannedScreen';
 
 const AppContent = () => {
   // Check if Supabase is properly configured
@@ -113,12 +114,9 @@ const AppContent = () => {
 
     if (data) {
       setProfile(data);
-      // Si l'utilisateur est banni, le déconnecter
+      // Si l'utilisateur est banni, afficher l'écran et attendre son clic
       if (data.banned) {
-        console.warn('Utilisateur banni détecté');
-        await supabase.auth.signOut();
-        setSession(null);
-        setProfile(null);
+        console.warn('⛔ UTILISATEUR BANNI - ÉCRAN DE BANNISSEMENT');
       } else {
         // Check if user needs to authorize location - show permission prompt
         // BUT: don't show if user already refused (localStorage flag)
@@ -157,6 +155,18 @@ const AppContent = () => {
         }}
       />
     );
+  }
+
+  // ⛔ Si l'utilisateur est banni, afficher l'écran de bannissement
+  if (profile && profile.banned) {
+    const handleBannedKick = async () => {
+      await supabase.auth.signOut();
+      setSession(null);
+      setProfile(null);
+      window.location.href = '/#/';
+    };
+
+    return <BannedScreen onKick={handleBannedKick} />;
   }
 
   return (

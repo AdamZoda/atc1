@@ -11,20 +11,24 @@ const AuthCallback: React.FC = () => {
     try {
       const identity = (user.identities || []).find((i: any) => i.provider === 'discord');
       let identityUsername = user.email || user.id;
+      let identityDisplayName = user.email || user.id; // 🎭 Nouveau: display_name
       let identityAvatar: string | undefined;
       if (identity && identity.identity_data) {
         const idata = identity.identity_data as any;
         identityUsername = idata.username ? `${idata.username}#${idata.discriminator || ''}`.replace(/#$/, '') : identityUsername;
+        // 🎭 Utiliser le display_name Discord ou le global_name, sinon username
+        identityDisplayName = idata.global_name || idata.username || identityUsername;
         if (idata.avatar) identityAvatar = `https://cdn.discordapp.com/avatars/${idata.id}/${idata.avatar}.png`;
       }
 
       // Fetch existing profile to avoid overwriting user edits
-      const { data: existingProfile } = await supabase.from('profiles').select('username, avatar_url').eq('id', user.id).single();
+      const { data: existingProfile } = await supabase.from('profiles').select('username, avatar_url, display_name').eq('id', user.id).maybeSingle();
 
       const finalUsername = existingProfile?.username || identityUsername;
+      const finalDisplayName = existingProfile?.display_name || identityDisplayName; // 🎭 Nouveau
       const finalAvatar = existingProfile?.avatar_url || identityAvatar || null;
 
-      await supabase.from('profiles').upsert({ id: user.id, username: finalUsername, avatar_url: finalAvatar });
+      await supabase.from('profiles').upsert({ id: user.id, username: finalUsername, avatar_url: finalAvatar, display_name: finalDisplayName });
     } catch (e) {
       console.error('persistProfileFromUser error', e);
       throw e;
