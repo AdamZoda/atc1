@@ -28,7 +28,7 @@
     - Avatar upload réparé (preview immédiat + auto-save)
     - Nouvel input file → beau bouton avec icône
     - Coordonnées GPS cachées (sécurité)
-    - Section "Ma Position" affiche lien Google Maps seulement
+    - Section "verify" affiche lien Google Maps seulement
     - Design amélioré (sections séparées)
     - Messages avec codes couleurs
   - **New Imports:** Upload icon, useRef

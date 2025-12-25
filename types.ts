@@ -9,6 +9,7 @@ export interface Profile {
   banned?: boolean;
   latitude?: number;
   longitude?: number;
+  provider_id?: string;
 }
 
 export interface Post {

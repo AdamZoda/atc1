@@ -124,12 +124,12 @@ const About: React.FC = () => {
     e.preventDefault();
     
     if (!session) {
-      alert('Vous devez être connecté pour commenter');
+      console.log('Vous devez être connecté pour commenter');
       return;
     }
     
     if (!commentMessage.trim()) {
-      alert('Veuillez écrire un message');
+      console.log('Veuillez écrire un message');
       return;
     }
 
@@ -146,7 +146,7 @@ const About: React.FC = () => {
 
       if (error) {
         console.error('❌ Erreur envoi commentaire:', error);
-        alert(`Erreur: ${error.message}`);
+        console.log(`Erreur: ${error.message}`);
       } else {
         console.log('✅ Commentaire publié instantanément');
         
@@ -155,12 +155,12 @@ const About: React.FC = () => {
           setComments([data[0], ...comments]);
         }
         
-        alert('✅ Commentaire publié!');
+        console.log('✅ Commentaire publié!');
         setCommentMessage('');
       }
     } catch (err: any) {
       console.error('❌ Erreur:', err.message);
-      alert(`Erreur: ${err.message}`);
+      console.log(`Erreur: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -170,12 +170,12 @@ const About: React.FC = () => {
     e.preventDefault();
 
     if (!session) {
-      alert('Vous devez être connecté pour ouvrir un ticket');
+      console.log('Vous devez être connecté pour ouvrir un ticket');
       return;
     }
 
     if (!ticketDescription.trim()) {
-      alert('Veuillez décrire votre problème');
+      console.log('Veuillez décrire votre problème');
       return;
     }
 
@@ -195,16 +195,16 @@ const About: React.FC = () => {
 
       if (error) {
         console.error('❌ Erreur création ticket:', error);
-        alert(`Erreur: ${error.message}`);
+        console.log(`Erreur: ${error.message}`);
       } else {
         console.log('✅ Ticket créé');
-        alert('✅ Ticket créé avec succès!');
+        console.log('✅ Ticket créé avec succès!');
         setTicketDescription('');
         setShowTicketForm(false);
       }
     } catch (err: any) {
       console.error('❌ Erreur:', err.message);
-      alert(`Erreur: ${err.message}`);
+      console.log(`Erreur: ${err.message}`);
     } finally {
       setTicketSubmitting(false);
     }
@@ -259,7 +259,7 @@ const About: React.FC = () => {
         .single();
 
       if (ticketError || !ticket?.allow_user_replies) {
-        alert('❌ L\'admin a désactivé les réponses sur ce ticket');
+        console.log('❌ L\'admin a désactivé les réponses sur ce ticket');
         setUserTicketReplying(false);
         return;
       }
@@ -283,7 +283,7 @@ const About: React.FC = () => {
 
       setUserTicketReply('');
     } catch (error: any) {
-      alert(`Erreur: ${error.message}`);
+      console.log(`Erreur: ${error.message}`);
     } finally {
       setUserTicketReplying(false);
     }
@@ -386,7 +386,7 @@ const About: React.FC = () => {
               <Users size={28} />
             </div>
             <h2 className="text-3xl font-cinzel font-bold uppercase tracking-widest mb-2">
-              Liste Administration
+               Administration
             </h2>
             <p className="text-gray-500 text-xs">L'équipe dévouée qui fait fonctionner le serveur</p>
           </div>
@@ -459,8 +459,6 @@ const About: React.FC = () => {
             initial={{ y: 20, opacity: 0 }}
             whileInView={{ y: 0, opacity: 1 }}
             viewport={{ once: true }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
             onClick={() => window.open(siteConfig.links.discord, '_blank')}
             className="relative group p-6 rounded-2xl border border-white/10 bg-gradient-to-br from-indigo-600/20 to-purple-600/20 hover:border-indigo-500/50 transition-all cursor-pointer"
           >
@@ -482,8 +480,6 @@ const About: React.FC = () => {
             whileInView={{ y: 0, opacity: 1 }}
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
             onClick={() => setShowTicketForm(!showTicketForm)}
             className="relative group p-6 rounded-2xl border border-white/10 bg-gradient-to-br from-emerald-600/20 to-green-600/20 hover:border-emerald-500/50 transition-all cursor-pointer"
           >
@@ -599,7 +595,7 @@ const About: React.FC = () => {
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            className="glass p-8 rounded-[2rem] border border-white/5 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            className="glass p-8 rounded-[2rem] border border-white/5 max-w-2xl w-full max-h-[90vh]"
           >
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-cinzel font-bold uppercase tracking-widest">

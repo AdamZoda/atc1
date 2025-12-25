@@ -7,6 +7,11 @@ import { Users, FilePlus, ShieldCheck, Trash2, Upload, Send, LayoutDashboard, Se
 import { useLanguage } from '../LanguageContext';
 import LocationDisplay from '../components/LocationDisplay';
 
+// Fonction silencieuse pour afficher une notification sans alerte
+const showToast = (message: string) => {
+  console.log('ℹ️', message);
+};
+
 const Admin: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'users' | 'posts' | 'config' | 'rules' | 'logs' | 'tickets' | 'music'>('users');
@@ -173,11 +178,26 @@ const Admin: React.FC = () => {
   };
 
   const fetchUsers = async () => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*');
-    if (data) setUsers(data);
-    setLoading(false);
+    try {
+      // Récupérer les profils
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('*');
+      
+      if (error) {
+        console.error('Erreur chargement profils:', error);
+        setLoading(false);
+        return;
+      }
+
+      if (profiles) {
+        setUsers(profiles);
+      }
+      setLoading(false);
+    } catch (err) {
+      console.error('Erreur fetchUsers:', err);
+      setLoading(false);
+    }
   };
 
   const fetchPosts = async () => {
@@ -203,7 +223,7 @@ const Admin: React.FC = () => {
       await logAdminAction('promote_admin', `⬆️ Promotion de ${username} en administrateur`, 'user', username);
       fetchUsers();
     } else {
-      alert(`Erreur: ${error.message}`);
+      console.log(`Erreur: ${error.message}`);
     }
   };
 
@@ -220,7 +240,7 @@ const Admin: React.FC = () => {
       await logAdminAction('edit_profile_permission', `${action} pour ${username}`, 'user', username);
       fetchUsers();
     } else {
-      alert(`Erreur: ${error.message}`);
+      console.log(`Erreur: ${error.message}`);
     }
   };
 
@@ -284,7 +304,7 @@ const Admin: React.FC = () => {
       await logAdminAction('page_visibility', `${action} la page ${pageName}`, 'page', pageName, { isVisible });
     } catch (error) {
       console.error('❌ ERREUR COMPLÈTE:', error);
-      alert('Erreur lors de la mise à jour: ' + (error as any).message);
+      console.log('Erreur lors de la mise à jour: ' + (error as any).message);
     } finally {
       setPageVisibilityLoading(false);
     }
@@ -492,7 +512,7 @@ const Admin: React.FC = () => {
 
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !content || !mediaUrl) return alert('Remplissez tous les champs (URL requise)');
+    if (!title || !content || !mediaUrl) return console.log('Remplissez tous les champs (URL requise)');
     
     setSubmitting(true);
     try {
@@ -508,7 +528,7 @@ const Admin: React.FC = () => {
 
       if (error) throw error;
 
-      alert('Post publié avec succès !');
+      console.log('Post publié avec succès !');
       // Log l'action
       await logAdminAction('create_post', `📝 Création d'un nouveau post "${title}"`, 'post', title);
       setTitle('');
@@ -518,7 +538,7 @@ const Admin: React.FC = () => {
       fetchPosts();
     } catch (err: any) {
       console.error('Error:', err);
-      alert(`Erreur: ${err.message}`);
+      console.log(`Erreur: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -534,7 +554,7 @@ const Admin: React.FC = () => {
         .eq('id', postId);
 
       if (error) throw error;
-      alert('Post supprimé !');
+      console.log('Post supprimé !');
       // Log l'action
       await logAdminAction('delete_post', `🗑️ Suppression du post #${postId}`, 'post', `Post #${postId}`);
       fetchPosts();
@@ -562,7 +582,7 @@ const Admin: React.FC = () => {
   const handleUpdatePost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingPost) return;
-    if (!title || !content || !mediaUrl) return alert('Remplissez tous les champs');
+    if (!title || !content || !mediaUrl) return console.log('Remplissez tous les champs');
     
     setSubmitting(true);
     try {
@@ -578,13 +598,13 @@ const Admin: React.FC = () => {
 
       if (error) throw error;
 
-      alert('Post mis à jour avec succès !');
+      console.log('Post mis à jour avec succès !');
       // Log l'action
       await logAdminAction('update_post', `✏️ Modification du post "${title}" (ID: ${editingPost.id})`, 'post', title);
       cancelEditPost();
       fetchPosts();
     } catch (err: any) {
-      alert(`Erreur: ${err.message}`);
+      console.log(`Erreur: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -592,7 +612,7 @@ const Admin: React.FC = () => {
 
   const handleUpdateBackground = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bgUrl) return alert('Entrez une URL valide');
+    if (!bgUrl) return console.log('Entrez une URL valide');
     
     setBgSubmitting(true);
     try {
@@ -634,7 +654,7 @@ const Admin: React.FC = () => {
 
       if (historyError) {
         console.error('❌ ERREUR HISTORIQUE:', historyError.message, historyError.code, historyError.details);
-        alert('⚠️ Background mis à jour mais historique échoué. Vérifiez la console (F12)');
+        console.log('⚠️ Background mis à jour mais historique échoué. Vérifiez la console (F12)');
       } else {
         console.log('✅ Historique enregistré:', insertedData);
       }
@@ -652,7 +672,7 @@ const Admin: React.FC = () => {
         console.log('✅ Anciens marqués comme non-courants');
       }
 
-      alert('✅ Fond d\'écran mis à jour avec succès !');
+      console.log('✅ Fond d\'écran mis à jour avec succès !');
       
       // Log l'action
       await logAdminAction(
@@ -678,7 +698,7 @@ const Admin: React.FC = () => {
   };
 
   const addCategory = async () => {
-    if (!newCategoryName.trim()) return alert('Entrez un nom de catégorie');
+    if (!newCategoryName.trim()) return console.log('Entrez un nom de catégorie');
 
     const { data, error } = await supabase
       .from('rule_categories')
@@ -718,7 +738,7 @@ const Admin: React.FC = () => {
 
   const addRule = async () => {
     if (!selectedCategoryId || !newRuleTitle.trim() || !newRuleContent.trim()) {
-      return alert('Remplissez tous les champs');
+      return console.log('Remplissez tous les champs');
     }
 
     const { error } = await supabase
@@ -783,7 +803,7 @@ const Admin: React.FC = () => {
 
   const addAdmin = async () => {
     if (!newAdminUsername || !newAdminRole || !newAdminPriority) {
-      return alert('Veuillez remplir tous les champs');
+      return console.log('Veuillez remplir tous les champs');
     }
 
     try {
@@ -809,7 +829,7 @@ const Admin: React.FC = () => {
       
       fetchAdminTeam();
     } catch (error: any) {
-      alert(`Erreur: ${error.message}`);
+      console.log(`Erreur: ${error.message}`);
     } finally {
       setAdminSubmitting(false);
     }
@@ -874,7 +894,7 @@ const Admin: React.FC = () => {
       // Log the action
       await logAdminAction('comment_added', `💬 Nouveau commentaire de ${username}`, 'comment', username);
     } catch (error: any) {
-      alert(`Erreur: ${error.message}`);
+      console.log(`Erreur: ${error.message}`);
     }
   };
 
@@ -898,7 +918,7 @@ const Admin: React.FC = () => {
 
   const addRole = async () => {
     if (!newRoleName) {
-      return alert('Veuillez entrer un nom de rôle');
+      return console.log('Veuillez entrer un nom de rôle');
     }
 
     try {
@@ -924,7 +944,7 @@ const Admin: React.FC = () => {
       
       fetchRoles();
     } catch (error: any) {
-      alert(`Erreur: ${error.message}`);
+      console.log(`Erreur: ${error.message}`);
     } finally {
       setRoleSubmitting(false);
     }
@@ -1108,7 +1128,7 @@ const Admin: React.FC = () => {
 
   const updateMusicUrl = async (url: string, name: string) => {
     if (!url.trim() || !name.trim()) {
-      alert('Veuillez remplir l\'URL et le nom de la musique');
+      console.log('Veuillez remplir l\'URL et le nom de la musique');
       return;
     }
 
@@ -1121,7 +1141,7 @@ const Admin: React.FC = () => {
         .limit(1);
 
       if (!existingData || !existingData[0]) {
-        alert('Erreur: Aucun enregistrement de musique trouvé');
+        console.log('Erreur: Aucun enregistrement de musique trouvé');
         setMusicSubmitting(false);
         return;
       }
@@ -1136,10 +1156,10 @@ const Admin: React.FC = () => {
       setMusicUrl(url);
       setMusicName(name);
       await logAdminAction('music_update', `🎵 Mise à jour de la musique: ${name}`, 'music', 'music');
-      alert('✅ Musique mise à jour!');
+      console.log('✅ Musique mise à jour!');
     } catch (error: any) {
       console.error('❌ Erreur mise à jour musique:', error);
-      alert(`Erreur: ${error.message}`);
+      console.log(`Erreur: ${error.message}`);
     } finally {
       setMusicSubmitting(false);
     }
@@ -1154,7 +1174,7 @@ const Admin: React.FC = () => {
         .limit(1);
 
       if (!existingData || !existingData[0]) {
-        alert('Erreur: Aucun enregistrement de musique trouvé');
+        console.log('Erreur: Aucun enregistrement de musique trouvé');
         return;
       }
 
@@ -1168,21 +1188,21 @@ const Admin: React.FC = () => {
 
       setIsPlayingMusic(newPlayingState);
       await logAdminAction('music_toggle', `🎵 Musique ${newPlayingState ? 'activée' : 'désactivée'}`, 'music', 'music');
-      alert(`✅ Musique ${newPlayingState ? 'lancée' : 'mise en pause'}!`);
+      console.log(`✅ Musique ${newPlayingState ? 'lancée' : 'mise en pause'}!`);
     } catch (error: any) {
       console.error('❌ Erreur toggle musique:', error);
-      alert(`Erreur: ${error.message}`);
+      console.log(`Erreur: ${error.message}`);
     }
   };
 
   const uploadMusicFile = async () => {
     if (!musicFile) {
-      alert('Veuillez sélectionner un fichier audio');
+      console.log('Veuillez sélectionner un fichier audio');
       return;
     }
 
     if (!musicName.trim()) {
-      alert('Veuillez donner un nom à la musique');
+      console.log('Veuillez donner un nom à la musique');
       return;
     }
 
@@ -1280,7 +1300,7 @@ const Admin: React.FC = () => {
         .limit(1);
 
       if (!existingData || !existingData[0]) {
-        alert('Erreur: Aucun enregistrement de musique trouvé');
+        console.log('Erreur: Aucun enregistrement de musique trouvé');
         setMusicUploading(false);
         setUploadProgress(0);
         setUploadTimeRemaining('');
@@ -1305,7 +1325,7 @@ const Admin: React.FC = () => {
       setTimeout(() => {
         setUploadProgress(0);
         setUploadTimeRemaining('');
-        alert('✅ Musique uploadée avec succès!');
+        console.log('✅ Musique uploadée avec succès!');
       }, 500);
     } catch (error: any) {
       console.error('❌ Erreur upload:', error);
@@ -1319,7 +1339,7 @@ const Admin: React.FC = () => {
         errorMessage = '❌ Le nom du fichier contient des caractères invalides.\n\nAssurez-vous que le nom contient uniquement des caractères simples (a-z, 0-9).';
       }
       
-      alert(`Erreur: ${errorMessage}`);
+      console.log(`Erreur: ${errorMessage}`);
       setUploadProgress(0);
       setUploadTimeRemaining('');
     } finally {
@@ -1453,8 +1473,6 @@ const Admin: React.FC = () => {
                       style={{
                         backgroundColor: roleFilter === 'admin' ? '#10b981' : '#6b7280'
                       }}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
                     >
                       <motion.div
                         className="absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-lg"
@@ -1479,8 +1497,6 @@ const Admin: React.FC = () => {
                       style={{
                         backgroundColor: statusFilter === 'banned' ? '#ef4444' : '#6b7280'
                       }}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
                     >
                       <motion.div
                         className="absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-lg"
@@ -1505,8 +1521,6 @@ const Admin: React.FC = () => {
                       style={{
                         backgroundColor: locationFilter === 'with' ? '#06b6d4' : '#6b7280'
                       }}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
                     >
                       <motion.div
                         className="absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-lg"
@@ -1535,6 +1549,7 @@ const Admin: React.FC = () => {
                   <th className="px-6 py-4 text-sm font-bold uppercase tracking-widest text-gray-400 w-1/6 text-center">Statut</th>
                   <th className="px-6 py-4 text-sm font-bold uppercase tracking-widest text-gray-400 w-1/5 text-center">Localisation</th>
                   <th className="px-6 py-4 text-sm font-bold uppercase tracking-widest text-gray-400 w-1/6 text-center">Créé le</th>
+                  <th className="px-6 py-4 text-sm font-bold uppercase tracking-widest text-gray-400 w-1/6 text-center">Discord ID</th>
                   <th className="px-6 py-4 text-sm font-bold uppercase tracking-widest text-gray-400 w-1/5 text-center">Actions</th>
                 </tr>
               </thead>
@@ -1616,6 +1631,25 @@ const Admin: React.FC = () => {
                           minute: '2-digit'
                         }) : 'N/A'}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      {user.provider_id ? (
+                        <button
+                          onClick={() => {
+                            const formattedId = `<@${user.provider_id}>`;
+                            navigator.clipboard.writeText(formattedId);
+                            console.log(`✅ Discord ID copié: ${formattedId}`);
+                          }}
+                          className="px-3 py-2 rounded-lg bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/40 transition-all text-xs font-bold uppercase tracking-widest"
+                          title={`Discord ID: <@${user.provider_id}>`}
+                        >
+                          📋 Copier ID
+                        </button>
+                      ) : (
+                        <span className="px-3 py-2 rounded-lg bg-gray-500/10 text-gray-500 text-xs font-bold uppercase tracking-widest inline-block cursor-not-allowed">
+                          ❌ Pas Discord
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2 justify-center flex-wrap">
@@ -1819,8 +1853,6 @@ const Admin: React.FC = () => {
                       style={{
                         backgroundColor: pageVisibilities[pageId] ? '#10b981' : '#6b7280'
                       }}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
                     >
                       <motion.div
                         className="absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-lg"

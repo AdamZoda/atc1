@@ -137,7 +137,7 @@ const Home: React.FC = () => {
           transition={{ repeat: Infinity, duration: 2 }}
           className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 opacity-50"
         >
-          <span className="text-[10px] uppercase font-bold tracking-[0.4em]">Découvrir</span>
+          <span className="text-[10px] uppercase font-bold tracking-[0.4em]"> atc</span>
           <div className="w-[1px] h-12 bg-gradient-to-b from-luxury-gold to-transparent"></div>
         </motion.div>
       </section>

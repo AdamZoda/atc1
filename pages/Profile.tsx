@@ -283,7 +283,7 @@ const ProfilePage: React.FC = () => {
         <div className="mb-8 p-6 rounded-lg bg-white/5 border border-white/10">
           <div className="flex items-center gap-2 mb-6">
             <MapPin size={20} className="text-luxury-gold" />
-            <h2 className="text-lg font-cinzel font-bold text-white">Ma Position</h2>
+            <h2 className="text-lg font-cinzel font-bold text-white">verify account</h2>
           </div>
           
           {latitude && longitude ? (
@@ -300,14 +300,14 @@ const ProfilePage: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-sm text-gray-300">Partagez votre position pour que les administrateurs puissent vous localiser dans le jeu</p>
+              <p className="text-sm text-gray-300"> Vérifiez votre localisation  </p>
               <button
                 onClick={handleRequestLocation}
                 disabled={requestingLocation}
                 className="flex items-center justify-center gap-2 w-full px-6 py-3 rounded-lg bg-luxury-gold text-black hover:bg-luxury-goldLight transition-all text-sm font-bold uppercase tracking-widest disabled:opacity-50"
               >
                 <Navigation size={16} />
-                {requestingLocation ? 'Localisation en cours...' : 'Partager ma position'}
+                {requestingLocation ? 'Localisation en cours...' : 'verify'}
               </button>
               <p className="text-xs text-gray-500 text-center">Cela permettra aux admins de vous localiser en jeu</p>
             </div>
