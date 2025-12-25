@@ -16,26 +16,7 @@ if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('placeholder')) {
   console.error('3. Redémarrez le serveur');
 }
 
-// Create client with proper configuration to avoid 406 errors
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-key',
-  {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true,
-    },
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    realtime: {
-      params: {
-        eventsPerSecond: 10,
-      },
-    },
-  }
-);
+export const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseAnonKey || 'placeholder-key');
 
 // Export validation function for UI
 export const isSupabaseConfigured = (): boolean => {

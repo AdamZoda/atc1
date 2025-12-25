@@ -6,9 +6,247 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="https://i.postimg.cc/L4wgGYg6/ATC.png">
     <title>Atlantic RP | L'excellence FiveM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              luxury: {
+                gold: '#D4AF37',
+                goldLight: '#F9E4B7',
+                goldDark: '#996515',
+                dark: '#050505',
+                card: 'rgba(20, 20, 20, 0.7)',
+                accent: '#8B0000'
+              }
+            },
+            fontFamily: {
+              cinzel: ['Cinzel', 'serif'],
+              inter: ['Inter', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        background-color: #050505;
+        color: #ffffff;
+        font-family: 'Inter', sans-serif;
+        overflow-x: hidden;
+      }
+      .glass {
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .text-glow-gold {
+        text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+      }
+      .button-glow:hover {
+        box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+      }
+      /* Custom scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #050505;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #D4AF37;
+        border-radius: 4px;
+      }
+
+      /* ===== RESPONSIVE OPTIMIZATIONS ===== */
+      
+      /* Tables responsives */
+      table {
+        min-width: 100%;
+        table-layout: auto;
+      }
+
+      /* Sur les petits écrans, réduire les padding et font-size */
+      @media (max-width: 768px) {
+        /* Navbar compression */
+        nav {
+          padding: 0.5rem !important;
+        }
+
+        /* Boutons navbar plus petits */
+        nav button, nav a {
+          padding: 0.5rem 0.75rem !important;
+          font-size: 0.75rem !important;
+          min-width: auto !important;
+        }
+
+        /* Logo plus petit */
+        nav img {
+          max-height: 40px !important;
+        }
+
+        /* Texte header plus petit */
+        nav h1, nav .logo-text {
+          font-size: 1rem !important;
+          margin: 0 !important;
+        }
+
+        /* Admin panel tabs responsif */
+        .admin-tabs {
+          flex-wrap: wrap;
+          gap: 0.5rem !important;
+        }
+
+        .admin-tabs button {
+          padding: 0.5rem 1rem !important;
+          font-size: 0.65rem !important;
+          white-space: nowrap !important;
+        }
+
+        /* Tables ajustement */
+        table th, table td {
+          padding: 0.75rem 0.5rem !important;
+          font-size: 0.75rem !important;
+        }
+
+        /* Boutons actions dans tableau */
+        table button {
+          padding: 0.25rem 0.5rem !important;
+          font-size: 0.65rem !important;
+          margin: 0.25rem !important;
+        }
+
+        /* Avatar images */
+        img[alt*="avatar"], img[alt*="profile"] {
+          width: 32px !important;
+          height: 32px !important;
+        }
+
+        /* Text truncation */
+        table td span, table td div {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          max-width: 150px;
+        }
+
+        /* Formulaires */
+        form {
+          gap: 0.5rem !important;
+        }
+
+        form input, form textarea, form select {
+          padding: 0.5rem !important;
+          font-size: 0.875rem !important;
+        }
+
+        /* Sections de contenu */
+        .content-section {
+          padding: 1rem !important;
+        }
+
+        /* Header admin panel */
+        .admin-header {
+          flex-direction: column !important;
+          gap: 1rem !important;
+        }
+
+        .admin-header img {
+          height: 40px !important;
+        }
+
+        .admin-header h2 {
+          font-size: 1.5rem !important;
+        }
+
+        /* Réduire les gaps globaux */
+        * {
+          gap: 0.5rem !important;
+        }
+
+        /* Cards et conteneurs */
+        .glass, [class*="glass"] {
+          padding: 1rem !important;
+        }
+      }
+
+      /* Ultra-petit écrans (téléphone) */
+      @media (max-width: 480px) {
+        /* Réduire encore plus */
+        nav {
+          padding: 0.25rem !important;
+        }
+
+        nav button, nav a {
+          padding: 0.25rem 0.5rem !important;
+          font-size: 0.65rem !important;
+        }
+
+        .admin-tabs button {
+          padding: 0.4rem 0.6rem !important;
+          font-size: 0.6rem !important;
+        }
+
+        table th, table td {
+          padding: 0.5rem 0.25rem !important;
+          font-size: 0.7rem !important;
+        }
+
+        table button {
+          padding: 0.2rem 0.4rem !important;
+          font-size: 0.6rem !important;
+        }
+
+        img[alt*="avatar"], img[alt*="profile"] {
+          width: 24px !important;
+          height: 24px !important;
+        }
+
+        /* Cacher les colonnes moins importantes */
+        table th:nth-child(n+5), 
+        table td:nth-child(n+5) {
+          display: none;
+        }
+      }
+
+      /* Medium screens (tablettes) */
+      @media (min-width: 769px) and (max-width: 1024px) {
+        table th, table td {
+          padding: 0.8rem 0.6rem !important;
+          font-size: 0.85rem !important;
+        }
+
+        .admin-tabs button {
+          padding: 0.6rem 1.2rem !important;
+          font-size: 0.75rem !important;
+        }
+      }
+
+      /* Grand écrans (desktop) */
+      @media (min-width: 1025px) {
+        /* Conserver les styles normaux */
+        table th, table td {
+          padding: 1.5rem 2rem !important;
+          font-size: 0.875rem !important;
+        }
+      }
+
+      /* Prevent horizontal scroll */
+      * {
+        max-width: 100vw;
+        overflow-x: hidden;
+      }
+
+      html, body {
+        width: 100%;
+        overflow-x: hidden;
+      }
+    </style>
 </head>
 <body>
     <div id="root"></div>

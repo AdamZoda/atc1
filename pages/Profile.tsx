@@ -6,6 +6,7 @@ import { MapPin, Navigation, Upload, X } from 'lucide-react';
 const ProfilePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [username, setUsername] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [avatar_url, setAvatarUrl] = useState('');
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -14,6 +15,7 @@ const ProfilePage: React.FC = () => {
   const [requestingLocation, setRequestingLocation] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState('');
   const [showLocationHelp, setShowLocationHelp] = useState(false);
+  const [canEditProfile, setCanEditProfile] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
@@ -34,10 +36,14 @@ const ProfilePage: React.FC = () => {
         const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
         if (profileData) {
           setUsername(profileData.username || '');
+          setDisplayName(profileData.display_name || '');
           setAvatarUrl(profileData.avatar_url || '');
           setAvatarPreview(profileData.avatar_url || '');
           setLatitude(profileData.latitude || null);
           setLongitude(profileData.longitude || null);
+          
+          // Par défaut REFUSÉ sauf si l'admin a explicitement autorisé
+          setCanEditProfile(profileData.can_edit_profile === true);
         }
       } catch (e) {
         console.error('Could not load profile', e);
@@ -56,7 +62,7 @@ const ProfilePage: React.FC = () => {
       const user = (data as any)?.user;
       if (!user) return;
 
-      const payload: any = { id: user.id, username };
+      const payload: any = { id: user.id, username, display_name: displayName };
       if (avatar_url) payload.avatar_url = avatar_url;
 
       const { error } = await supabase.from('profiles').upsert(payload);
@@ -219,6 +225,11 @@ const ProfilePage: React.FC = () => {
         {/* Avatar Section */}
         <div className="mb-8 pb-8 border-b border-white/10">
           <h2 className="text-lg font-cinzel font-bold text-white mb-6">Avatar</h2>
+          {!canEditProfile && (
+            <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-sm">
+              🔒 Vous n'avez pas la permission de modifier votre avatar
+            </div>
+          )}
           <div className="flex items-center gap-8">
             <div className="flex-shrink-0">
               <img 
@@ -237,8 +248,8 @@ const ProfilePage: React.FC = () => {
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="flex items-center gap-2 px-6 py-3 rounded-lg bg-luxury-gold text-black hover:bg-luxury-goldLight transition-all text-sm font-bold uppercase tracking-widest disabled:opacity-50 mb-3"
+                disabled={uploading || !canEditProfile}
+                className="flex items-center gap-2 px-6 py-3 rounded-lg bg-luxury-gold text-black hover:bg-luxury-goldLight transition-all text-sm font-bold uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed mb-3"
               >
                 <Upload size={18} />
                 {uploading ? 'Téléchargement...' : 'Changer d\'avatar'}
@@ -253,11 +264,17 @@ const ProfilePage: React.FC = () => {
         {/* Username Section */}
         <div className="mb-8 pb-8 border-b border-white/10">
           <label className="block text-sm font-semibold text-gray-300 mb-3 uppercase tracking-widest">Nom affiché</label>
+          {!canEditProfile && (
+            <div className="mb-3 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-sm">
+              🔒 Vous n'avez pas la permission de modifier votre nom affiché
+            </div>
+          )}
           <input
-            className="w-full p-3 rounded-lg bg-black/40 border border-white/10 text-white focus:border-luxury-gold focus:outline-none transition-all mb-2"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            className={`w-full p-3 rounded-lg bg-black/40 border border-white/10 text-white focus:border-luxury-gold focus:outline-none transition-all mb-2 ${!canEditProfile ? 'opacity-50 cursor-not-allowed' : ''}`}
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
             placeholder="Votre nom public (ex: JohnDoe)"
+            disabled={!canEditProfile}
           />
           <p className="text-xs text-gray-400">Ce nom sera visible pour les autres joueurs</p>
         </div>

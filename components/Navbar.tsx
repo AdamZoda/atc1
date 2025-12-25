@@ -163,7 +163,7 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
 
               <div className="flex flex-col items-end">
                 {(() => {
-                  const nameFromProfile = profile?.username || '';
+                  const nameFromProfile = profile?.display_name || profile?.username || '';
                   const isEmail = nameFromProfile.includes && nameFromProfile.includes('@');
                   const display = !isEmail && nameFromProfile ? nameFromProfile : (fallbackName || nameFromProfile || profile?.id);
                   return (

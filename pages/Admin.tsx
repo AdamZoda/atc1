@@ -48,6 +48,12 @@ const Admin: React.FC = () => {
   const [backgroundHistory, setBackgroundHistory] = useState<any[]>([]);
   const [bgHistoryLoading, setBgHistoryLoading] = useState(false);
 
+  // Filter state for users
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'user'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'banned'>('all');
+  const [locationFilter, setLocationFilter] = useState<'all' | 'with' | 'without'>('all');
+
   // Admin logs state
   const [adminLogs, setAdminLogs] = useState<any[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
@@ -195,6 +201,23 @@ const Admin: React.FC = () => {
     if (!error) {
       // Log l'action
       await logAdminAction('promote_admin', `⬆️ Promotion de ${username} en administrateur`, 'user', username);
+      fetchUsers();
+    } else {
+      alert(`Erreur: ${error.message}`);
+    }
+  };
+
+  const toggleEditProfilePermission = async (userId: string, username: string, currentState: boolean) => {
+    const newState = !currentState;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ can_edit_profile: newState })
+      .eq('id', userId);
+    
+    if (!error) {
+      // Log l'action
+      const action = newState ? '🔓 Autoriser modifications de profil' : '🔒 Bloquer modifications de profil';
+      await logAdminAction('edit_profile_permission', `${action} pour ${username}`, 'user', username);
       fetchUsers();
     } else {
       alert(`Erreur: ${error.message}`);
@@ -1338,7 +1361,7 @@ const Admin: React.FC = () => {
       exit={{ opacity: 0 }}
       className="pt-32 pb-24 bg-luxury-dark min-h-screen"
     >
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="w-full mx-auto px-16 max-w-screen-2xl">
         <header className="mb-12 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
             <img src="https://i.postimg.cc/L4wgGYg6/ATC.png" alt="Atlantic RP" className="h-16 w-auto" />
@@ -1404,54 +1427,187 @@ const Admin: React.FC = () => {
         </header>
 
         {activeTab === 'users' && (
-          <div className="glass rounded-3xl overflow-hidden border border-white/5">
+          <div>
+            {/* Filtres et Recherche */}
+            <div className="glass rounded-3xl overflow-hidden border border-white/5 mb-6 p-6">
+              <div className="space-y-6">
+                {/* Search Bar */}
+                <div>
+                  <input
+                    type="text"
+                    placeholder="🔍 Chercher un utilisateur..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full px-4 py-3 rounded-lg bg-black/50 border border-white/10 focus:border-luxury-gold text-white placeholder-gray-500 outline-none transition-all text-sm"
+                  />
+                </div>
+
+                {/* Toggle Filters */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  {/* Role Filter - Toggle */}
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-bold uppercase tracking-widest text-gray-300">👑 Admin Seulement</label>
+                    <motion.button
+                      onClick={() => setRoleFilter(roleFilter === 'admin' ? 'all' : 'admin')}
+                      className="relative w-16 h-8 rounded-full transition-colors"
+                      style={{
+                        backgroundColor: roleFilter === 'admin' ? '#10b981' : '#6b7280'
+                      }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <motion.div
+                        className="absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-lg"
+                        animate={{
+                          x: roleFilter === 'admin' ? 32 : 0
+                        }}
+                        transition={{
+                          type: 'spring',
+                          stiffness: 500,
+                          damping: 40
+                        }}
+                      />
+                    </motion.button>
+                  </div>
+
+                  {/* Status Filter - Toggle */}
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-bold uppercase tracking-widest text-gray-300">🚫 Afficher Bannis</label>
+                    <motion.button
+                      onClick={() => setStatusFilter(statusFilter === 'banned' ? 'all' : 'banned')}
+                      className="relative w-16 h-8 rounded-full transition-colors"
+                      style={{
+                        backgroundColor: statusFilter === 'banned' ? '#ef4444' : '#6b7280'
+                      }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <motion.div
+                        className="absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-lg"
+                        animate={{
+                          x: statusFilter === 'banned' ? 32 : 0
+                        }}
+                        transition={{
+                          type: 'spring',
+                          stiffness: 500,
+                          damping: 40
+                        }}
+                      />
+                    </motion.button>
+                  </div>
+
+                  {/* Location Filter - Toggle */}
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-bold uppercase tracking-widest text-gray-300">📍 Avec Localisation</label>
+                    <motion.button
+                      onClick={() => setLocationFilter(locationFilter === 'with' ? 'all' : 'with')}
+                      className="relative w-16 h-8 rounded-full transition-colors"
+                      style={{
+                        backgroundColor: locationFilter === 'with' ? '#06b6d4' : '#6b7280'
+                      }}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <motion.div
+                        className="absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-lg"
+                        animate={{
+                          x: locationFilter === 'with' ? 32 : 0
+                        }}
+                        transition={{
+                          type: 'spring',
+                          stiffness: 500,
+                          damping: 40
+                        }}
+                      />
+                    </motion.button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Tableau */}
+            <div className="glass rounded-3xl overflow-hidden border border-white/5">
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-white/10 bg-white/5">
-                  <th className="px-8 py-6 text-sm font-bold uppercase tracking-widest text-gray-400">Utilisateur</th>
-                  <th className="px-8 py-6 text-sm font-bold uppercase tracking-widest text-gray-400">Rôle</th>
-                  <th className="px-8 py-6 text-sm font-bold uppercase tracking-widest text-gray-400">Statut</th>
-                  <th className="px-8 py-6 text-sm font-bold uppercase tracking-widest text-gray-400">Localisation</th>
-                  <th className="px-8 py-6 text-sm font-bold uppercase tracking-widest text-gray-400">Créé le</th>
-                  <th className="px-8 py-6 text-sm font-bold uppercase tracking-widest text-gray-400 text-right">Actions</th>
+                  <th className="px-6 py-4 text-sm font-bold uppercase tracking-widest text-gray-400 w-1/4">Utilisateur</th>
+                  <th className="px-6 py-4 text-sm font-bold uppercase tracking-widest text-gray-400 w-1/6 text-center">Rôle</th>
+                  <th className="px-6 py-4 text-sm font-bold uppercase tracking-widest text-gray-400 w-1/6 text-center">Statut</th>
+                  <th className="px-6 py-4 text-sm font-bold uppercase tracking-widest text-gray-400 w-1/5 text-center">Localisation</th>
+                  <th className="px-6 py-4 text-sm font-bold uppercase tracking-widest text-gray-400 w-1/6 text-center">Créé le</th>
+                  <th className="px-6 py-4 text-sm font-bold uppercase tracking-widest text-gray-400 w-1/5 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {users.map((user) => (
+                {users
+                  .filter((user) => {
+                    // Filtre recherche
+                    const searchMatch = (user.display_name || user.username || user.email || '')
+                      .toLowerCase()
+                      .includes(searchTerm.toLowerCase());
+
+                    // Filtre rôle
+                    const roleMatch =
+                      roleFilter === 'all' || user.role === roleFilter;
+
+                    // Filtre statut
+                    const statusMatch =
+                      statusFilter === 'all' ||
+                      (statusFilter === 'active' && !user.banned) ||
+                      (statusFilter === 'banned' && user.banned);
+
+                    // Filtre localisation
+                    const hasLocation = user.latitude && user.longitude;
+                    const locationMatch =
+                      locationFilter === 'all' ||
+                      (locationFilter === 'with' && hasLocation) ||
+                      (locationFilter === 'without' && !hasLocation);
+
+                    return searchMatch && roleMatch && statusMatch && locationMatch;
+                  })
+                  .map((user) => (
                   <tr key={user.id} className={`hover:bg-white/5 transition-colors ${user.banned ? 'opacity-60' : ''}`}>
-                    <td className="px-8 py-6">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-luxury-gold/20 flex items-center justify-center text-luxury-gold font-bold">
-                          {user.username.charAt(0).toUpperCase()}
-                        </div>
-                        <span className="font-bold text-white">{user.username}</span>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        {user.avatar_url ? (
+                          <img 
+                            src={user.avatar_url} 
+                            alt={user.display_name || user.username}
+                            className="w-10 h-10 rounded-full object-cover border border-white/10 flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-luxury-gold/20 flex items-center justify-center text-luxury-gold font-bold flex-shrink-0">
+                            {(user.display_name || user.username).charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <span className="font-bold text-white truncate">{user.display_name || user.username}</span>
                       </div>
                     </td>
-                    <td className="px-8 py-6">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${user.role === 'admin' ? 'bg-luxury-gold/20 text-luxury-gold' : 'bg-white/10 text-gray-400'}`}>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest inline-block ${user.role === 'admin' ? 'bg-luxury-gold/20 text-luxury-gold' : 'bg-white/10 text-gray-400'}`}>
                         {user.role}
                       </span>
                     </td>
-                    <td className="px-8 py-6">
+                    <td className="px-6 py-4 text-center">
                       {user.banned ? (
-                        <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-red-500/20 text-red-400">
+                        <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-red-500/20 text-red-400 inline-block">
                           🚫 Banni
                         </span>
                       ) : (
-                        <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-green-500/20 text-green-400">
+                        <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-green-500/20 text-green-400 inline-block">
                           ✓ Actif
                         </span>
                       )}
                     </td>
-                    <td className="px-8 py-6">
+                    <td className="px-6 py-4 text-center">
                       <LocationDisplay 
                         latitude={user.latitude}
                         longitude={user.longitude}
                         linkClassName="text-luxury-gold hover:text-luxury-goldLight text-xs font-bold uppercase tracking-widest underline"
                       />
                     </td>
-                    <td className="px-8 py-6">
-                      <span className="text-xs text-gray-400">
+                    <td className="px-6 py-4 text-center">
+                      <span className="text-xs text-gray-400 block">
                         {user.created_at ? new Date(user.created_at).toLocaleDateString('fr-FR', { 
                           year: 'numeric', 
                           month: 'numeric', 
@@ -1461,8 +1617,21 @@ const Admin: React.FC = () => {
                         }) : 'N/A'}
                       </span>
                     </td>
-                    <td className="px-8 py-6 text-right">
-                      <div className="flex items-center gap-2 ml-auto justify-end">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2 justify-center flex-wrap">
+                        {/* Toggle Edit Profile Permission */}
+                        <button
+                          onClick={() => toggleEditProfilePermission(user.id, user.username, user.can_edit_profile)}
+                          className={`px-3 py-2 rounded-lg transition-all text-xs font-bold uppercase tracking-widest ${
+                            user.can_edit_profile 
+                              ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/40' 
+                              : 'bg-gray-500/20 text-gray-400 hover:bg-gray-500/40'
+                          }`}
+                          title={user.can_edit_profile ? 'Bloquer modifications' : 'Autoriser modifications'}
+                        >
+                          {user.can_edit_profile ? '🔓 Édition' : '🔒 Bloqué'}
+                        </button>
+
                         {user.role !== 'admin' && !user.banned && (
                           <button 
                             onClick={() => promoteAdmin(user.id)}
@@ -1506,6 +1675,7 @@ const Admin: React.FC = () => {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
 
@@ -2185,6 +2355,67 @@ const Admin: React.FC = () => {
                   </div>
                 ))
               )}
+            </div>
+          </div>
+        )}
+
+        {/* PROFILE PERMISSIONS SECTION */}
+        {activeTab === 'config' && (
+          <div className="glass p-8 rounded-2xl border border-white/5 col-span-1 lg:col-span-2 mt-6">
+            <div className="text-center mb-8">
+              <div className="w-12 h-12 bg-luxury-gold/10 rounded-xl flex items-center justify-center mx-auto mb-4 text-luxury-gold">
+                🔐
+              </div>
+              <h3 className="text-xl font-cinzel font-bold uppercase tracking-widest">Permissions de Profil</h3>
+              <p className="text-gray-500 text-xs mt-1">Bloquer/Débloquer les modifications pour TOUS les utilisateurs</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Block All Profiles */}
+              <button
+                onClick={async () => {
+                  if (window.confirm('⚠️ Êtes-vous sûr ? Cela bloquera TOUS les utilisateurs')) {
+                    const { error } = await supabase.from('profiles').update({ can_edit_profile: false }).gte('created_at', '1900-01-01');
+                    if (!error) {
+                      alert('✅ Tous les profils sont bloqués');
+                      await logAdminAction('bulk_block_profiles', '🔒 Tous les profils ont été bloqués', 'config', 'bulk');
+                      fetchUsers();
+                    } else {
+                      alert('❌ Erreur: ' + error.message);
+                    }
+                  }
+                }}
+                className="p-6 rounded-lg bg-red-500/10 border-2 border-red-500/30 hover:border-red-500/60 hover:bg-red-500/20 transition-all"
+              >
+                <div className="text-lg font-bold text-red-400 mb-2">🔒 Bloquer TOUS</div>
+                <p className="text-xs text-red-300">Les utilisateurs ne peuvent pas modifier leur profil</p>
+              </button>
+
+              {/* Unlock All Profiles */}
+              <button
+                onClick={async () => {
+                  if (window.confirm('✅ Êtes-vous sûr ? Cela débloquera TOUS les utilisateurs')) {
+                    const { error } = await supabase.from('profiles').update({ can_edit_profile: true }).gte('created_at', '1900-01-01');
+                    if (!error) {
+                      alert('✅ Tous les profils sont débloqués');
+                      await logAdminAction('bulk_unlock_profiles', '🔓 Tous les profils ont été débloqués', 'config', 'bulk');
+                      fetchUsers();
+                    } else {
+                      alert('❌ Erreur: ' + error.message);
+                    }
+                  }
+                }}
+                className="p-6 rounded-lg bg-green-500/10 border-2 border-green-500/30 hover:border-green-500/60 hover:bg-green-500/20 transition-all"
+              >
+                <div className="text-lg font-bold text-green-400 mb-2">🔓 Débloquer TOUS</div>
+                <p className="text-xs text-green-300">Les utilisateurs peuvent modifier leur profil</p>
+              </button>
+            </div>
+
+            <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-600/30 rounded-xl">
+              <p className="text-yellow-500 text-xs font-bold uppercase tracking-widest">
+                ⚠️ Attention: Ces actions s'appliquent à TOUS les utilisateurs à la fois. Vous pouvez aussi gérer les permissions individuelles depuis la liste des utilisateurs.
+              </p>
             </div>
           </div>
         )}

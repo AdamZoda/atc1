@@ -17,12 +17,10 @@ const MusicContext = createContext<MusicContextType | undefined>(undefined);
 export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [musicUrl, setMusicUrl] = useState<string | null>(null);
   const [musicName, setMusicName] = useState('Musique du Serveur');
-  // ⚠️ IMPORTANT: Start with isPlaying=false to respect browser autoplay policies
-  // Users must explicitly click play button first (browser requires user interaction for autoplay)
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(20);
 
-  // Charger la musique depuis la base de données au démarrage
+  // Charger la musique depuis la base de données au démarrage UNIQUEMENT
   useEffect(() => {
     fetchMusic();
     
@@ -38,14 +36,11 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       )
       .subscribe();
 
-    // Refresh la musique toutes les 5 secondes pour synchroniser avec les admins
-    const interval = setInterval(() => {
-      fetchMusic();
-    }, 5000);
+    // ✅ SUPPRIMÉ: Le refresh toutes les 5 secondes qui causait les duplications
+    // Plus de setInterval qui recharge constamment la musique!
 
     return () => {
       subscription.unsubscribe();
-      clearInterval(interval);
     };
   }, []);
 
@@ -85,11 +80,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         
         setMusicUrl(validUrl);
         setMusicName(data[0].music_name);
-        // ⚠️ DO NOT auto-play - browser policy requires user interaction
-        // Only sync database is_playing status, but don't force playback
-        if (data[0].is_playing && musicUrl) {
-          console.log('ℹ️ Musique en lecture côté serveur, en attente d\'interaction utilisateur');
-        }
+        setIsPlaying(data[0].is_playing);
         setVolume(data[0].volume);
       }
     } catch (error: any) {

@@ -17,16 +17,41 @@ const AuthCallback: React.FC = () => {
       let identityAvatar: string | undefined;
       
       console.log('🔍 Discord identity:', identity);
+      console.log('📋 User metadata:', user.user_metadata);
       
       if (identity && identity.identity_data) {
         const idata = identity.identity_data as any;
         console.log('📊 Identity data:', idata);
         
         identityUsername = idata.username ? `${idata.username}#${idata.discriminator || ''}`.replace(/#$/, '') : identityUsername;
-        identityDisplayName = idata.global_name || idata.username || identityUsername;
+        // Try to get display name from: global_name (custom_claims) > username > fallback
+        identityDisplayName = idata.global_name || idata.full_name || idata.username || identityUsername;
         if (idata.avatar) {
           identityAvatar = `https://cdn.discordapp.com/avatars/${idata.id}/${idata.avatar}.png`;
           console.log('🖼️ Avatar URL:', identityAvatar);
+        }
+      }
+      
+      // Also try to get display name from raw_user_meta_data if not found in identity_data
+      if (user.user_metadata) {
+        const metadata = user.user_metadata as any;
+        if (metadata.custom_claims?.global_name) {
+          identityDisplayName = metadata.custom_claims.global_name;
+          console.log('✨ Found global_name in custom_claims:', identityDisplayName);
+        } else if (metadata.full_name && !identityDisplayName.includes('@')) {
+          identityDisplayName = metadata.full_name;
+          console.log('✨ Found full_name in metadata:', identityDisplayName);
+        }
+        
+        // Get avatar from metadata if not found in identity_data
+        if (!identityAvatar) {
+          if (metadata.avatar_url) {
+            identityAvatar = metadata.avatar_url;
+            console.log('🖼️ Found avatar_url in metadata:', identityAvatar);
+          } else if (metadata.picture) {
+            identityAvatar = metadata.picture;
+            console.log('🖼️ Found picture in metadata:', identityAvatar);
+          }
         }
       }
 
@@ -124,11 +149,22 @@ const AuthCallback: React.FC = () => {
 
         // Nothing worked — try manual parse of URL fragment (fallback)
         console.warn('Aucune session après callback, tentative de fallback en analysant le hash');
+        
+        // When using HashRouter with OAuth, the URL looks like: #/auth/callback#access_token=...
+        // We need to extract BOTH the route part and the token fragment
         const hash = window.location.hash || '';
-        // Extract the fragment after the last '#' (handles '#/auth/callback#access_token=...')
-        const lastHash = hash.lastIndexOf('#');
-        const fragment = lastHash !== -1 ? hash.slice(lastHash + 1) : hash.replace(/^#/, '');
+        console.log('Full hash:', hash);
+        
+        // Split by the second # to separate route from token fragment
+        const hashParts = hash.split('#');
+        console.log('Hash parts:', hashParts);
+        
+        // hashParts[0] = '' (before first #)
+        // hashParts[1] = '/auth/callback' (the route)
+        // hashParts[2] = 'access_token=...&refresh_token=...' (the tokens)
+        const fragment = hashParts[2] || hashParts[1] || '';
         console.log('Parsed fragment for tokens:', fragment);
+        
         const params = new URLSearchParams(fragment);
         const access_token = params.get('access_token');
         const refresh_token = params.get('refresh_token');
