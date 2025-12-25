@@ -105,24 +105,24 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
   }, []);
 
   return (
-    <nav className="fixed w-full z-50 px-4 py-4 md:px-10">
-      <div className="max-w-7xl mx-auto glass rounded-2xl flex items-center justify-between px-6 py-4">
+    <nav className="fixed w-full z-50 px-2 py-4 md:px-10">
+      <div className="max-w-7xl mx-auto glass rounded-2xl flex items-center justify-between px-4 md:px-6 py-4">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-3">
-          <img src="https://i.postimg.cc/L4wgGYg6/ATC.png" alt="Atlantic RP" className="h-12 w-auto" />
-          <span className="hidden md:block font-cinzel text-xl font-bold tracking-widest bg-gradient-to-r from-luxury-gold to-white bg-clip-text text-transparent">
+        <Link to="/" className="flex items-center gap-2 md:gap-3 flex-shrink-0">
+          <img src="https://i.postimg.cc/L4wgGYg6/ATC.png" alt="Atlantic RP" className="h-10 md:h-12 w-auto" />
+          <span className="hidden md:block font-cinzel text-sm md:text-xl font-bold tracking-widest bg-gradient-to-r from-luxury-gold to-white bg-clip-text text-transparent">
             ATLANTIC RP
           </span>
         </Link>
 
         {/* Desktop Links */}
-        <div className="hidden lg:flex items-center gap-8">
+        <div className="hidden lg:flex items-center gap-4 xl:gap-8 flex-wrap justify-center flex-1 mx-4">
           {getNavLinks().map((link) => (
             link.visible === true && (
               <Link
                 key={link.path}
                 to={link.path}
-                className={`relative font-medium transition-colors duration-300 hover:text-luxury-gold ${
+                className={`relative font-medium text-xs md:text-sm transition-colors duration-300 hover:text-luxury-gold whitespace-nowrap ${
                   location.pathname === link.path ? 'text-luxury-gold' : 'text-gray-300'
                 }`}
               >
@@ -139,44 +139,44 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
         </div>
 
         {/* Auth Actions */}
-        <div className="hidden md:flex items-center gap-4">
+        <div className="hidden md:flex items-center gap-2 md:gap-4 flex-shrink-0">
           {/* Language Switcher */}
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10">
-            <Globe size={16} className="text-luxury-gold" />
+          <div className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-2 rounded-lg bg-white/5 border border-white/10">
+            <Globe size={14} className="text-luxury-gold flex-shrink-0" />
             <button
               onClick={() => setLanguage(language === 'en' ? 'fr' : 'en')}
-              className="px-2 py-1 text-sm font-semibold transition-all hover:text-luxury-gold"
+              className="px-1 md:px-2 py-1 text-xs md:text-sm font-semibold transition-all hover:text-luxury-gold"
             >
               {language.toUpperCase()}
             </button>
           </div>
 
           {profile ? (
-            <div className="flex items-center gap-4">
-              <Link to="/profile" className="flex items-center gap-3">
+            <div className="flex items-center gap-2 md:gap-4">
+              <Link to="/profile" className="flex items-center gap-2 md:gap-3">
                 <img
                   src={profile.avatar_url || DEFAULT_AVATAR}
                   alt="avatar"
-                  className="w-10 h-10 rounded-full object-cover border border-white/10"
+                  className="w-8 md:w-10 h-8 md:h-10 rounded-full object-cover border border-white/10 flex-shrink-0"
                 />
               </Link>
 
-              <div className="flex flex-col items-end">
+              <div className="hidden sm:flex flex-col items-end">
                 {(() => {
                   const nameFromProfile = profile?.display_name || profile?.username || '';
                   const isEmail = nameFromProfile.includes && nameFromProfile.includes('@');
                   const display = !isEmail && nameFromProfile ? nameFromProfile : (fallbackName || nameFromProfile || profile?.id);
                   return (
-                    <Link to="/profile" className="text-sm font-semibold text-white hover:underline">
+                    <Link to="/profile" className="text-xs md:text-sm font-semibold text-white hover:underline truncate">
                       {display}
                     </Link>
                   );
                 })()}
-                <span className="text-[10px] uppercase tracking-tighter text-luxury-gold">{profile.role}</span>
+                <span className="text-[8px] md:text-[10px] uppercase tracking-tighter text-luxury-gold">{profile.role}</span>
               </div>
               <button 
                 onClick={handleLogout}
-                className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-sm font-medium"
+                className="px-3 md:px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-xs md:text-sm font-medium whitespace-nowrap flex-shrink-0"
               >
                 {t('nav.logout')}
               </button>
@@ -184,10 +184,10 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
           ) : (
             <Link 
               to="/login"
-              className="flex items-center gap-2 px-6 py-2 rounded-lg bg-luxury-gold hover:bg-luxury-goldLight transition-all text-black font-bold button-glow"
+              className="flex items-center gap-2 px-4 md:px-6 py-2 rounded-lg bg-luxury-gold hover:bg-luxury-goldLight transition-all text-black text-xs md:text-sm font-bold button-glow flex-shrink-0"
             >
-              <LogIn size={18} />
-              {t('nav.login')}
+              <LogIn size={16} className="flex-shrink-0" />
+              <span className="hidden sm:inline">{t('nav.login')}</span>
             </Link>
           )}
         </div>
