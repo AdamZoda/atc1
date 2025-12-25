@@ -211,17 +211,17 @@ const AppContent = () => {
               <Route path="/game" element={<GamePage profile={profile} />} />
               <Route path="/shop" element={<Shop />} />
               
-              {/* Protected Routes */}
+              {/* Protected Routes - STRICT: Profile MUST exist */}
               <Route 
                 path="/media" 
-                element={session ? <Media /> : <Navigate to="/signup" />} 
+                element={(session && profile) ? <Media /> : <Navigate to="/login" />} 
               />
               <Route 
                 path="/admin" 
                 element={(profile && profile.role === 'admin') ? <Admin /> : <Navigate to="/" />} 
               />
 
-              <Route path="/profile" element={session ? <ProfilePage /> : <Navigate to="/login" />} />
+              <Route path="/profile" element={(session && profile) ? <ProfilePage /> : <Navigate to="/login" />} />
               
               {/* Auth Routes */}
               <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />

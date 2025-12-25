@@ -9,28 +9,57 @@ const AuthCallback: React.FC = () => {
   // Merge identity data into profiles without overwriting existing user edits.
   const persistProfileFromUser = async (user: any) => {
     try {
+      console.log('👤 persistProfileFromUser - User data:', user);
+      
       const identity = (user.identities || []).find((i: any) => i.provider === 'discord');
       let identityUsername = user.email || user.id;
-      let identityDisplayName = user.email || user.id; // 🎭 Nouveau: display_name
+      let identityDisplayName = user.email || user.id;
       let identityAvatar: string | undefined;
+      
+      console.log('🔍 Discord identity:', identity);
+      
       if (identity && identity.identity_data) {
         const idata = identity.identity_data as any;
+        console.log('📊 Identity data:', idata);
+        
         identityUsername = idata.username ? `${idata.username}#${idata.discriminator || ''}`.replace(/#$/, '') : identityUsername;
-        // 🎭 Utiliser le display_name Discord ou le global_name, sinon username
         identityDisplayName = idata.global_name || idata.username || identityUsername;
-        if (idata.avatar) identityAvatar = `https://cdn.discordapp.com/avatars/${idata.id}/${idata.avatar}.png`;
+        if (idata.avatar) {
+          identityAvatar = `https://cdn.discordapp.com/avatars/${idata.id}/${idata.avatar}.png`;
+          console.log('🖼️ Avatar URL:', identityAvatar);
+        }
       }
 
       // Fetch existing profile to avoid overwriting user edits
-      const { data: existingProfile } = await supabase.from('profiles').select('username, avatar_url, display_name').eq('id', user.id).maybeSingle();
+      const { data: existingProfile, error: fetchError } = await supabase.from('profiles').select('username, avatar_url, display_name').eq('id', user.id).maybeSingle();
+      
+      if (fetchError) {
+        console.error('❌ Erreur fetch profil:', fetchError);
+      } else {
+        console.log('📋 Profil existant:', existingProfile);
+      }
 
       const finalUsername = existingProfile?.username || identityUsername;
-      const finalDisplayName = existingProfile?.display_name || identityDisplayName; // 🎭 Nouveau
+      const finalDisplayName = existingProfile?.display_name || identityDisplayName;
       const finalAvatar = existingProfile?.avatar_url || identityAvatar || null;
 
-      await supabase.from('profiles').upsert({ id: user.id, username: finalUsername, avatar_url: finalAvatar, display_name: finalDisplayName });
+      console.log('💾 Données à upsert:', { id: user.id, username: finalUsername, display_name: finalDisplayName, avatar_url: finalAvatar });
+
+      const { data: upsertData, error: upsertError } = await supabase.from('profiles').upsert({ 
+        id: user.id, 
+        username: finalUsername, 
+        avatar_url: finalAvatar, 
+        display_name: finalDisplayName 
+      });
+      
+      if (upsertError) {
+        console.error('❌ Erreur upsert profil:', upsertError);
+        throw upsertError;
+      } else {
+        console.log('✅ Profil créé/mis à jour:', upsertData);
+      }
     } catch (e) {
-      console.error('persistProfileFromUser error', e);
+      console.error('❌ persistProfileFromUser error', e);
       throw e;
     }
   };

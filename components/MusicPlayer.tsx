@@ -37,8 +37,16 @@ const MusicPlayer: React.FC = () => {
           console.log('✅ Lecture réussie');
           setIsAudioPlaying(true);
         })
-        .catch((err) => {
-          console.error('❌ Erreur lecture:', err);
+        .catch((err: any) => {
+          // Common errors:
+          // - NotAllowedError: Browser blocks autoplay without user interaction
+          // - NotSupportedError: Audio format not supported
+          // - AbortError: Playback was aborted
+          if (err.name === 'NotAllowedError') {
+            console.warn('⚠️ Autoplay bloqué - Cliquez sur le lecteur pour lancer la musique');
+          } else {
+            console.error('❌ Erreur lecture:', err.message || err);
+          }
         });
     } else {
       audioRef.current.pause();

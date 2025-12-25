@@ -17,6 +17,8 @@ const MusicContext = createContext<MusicContextType | undefined>(undefined);
 export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [musicUrl, setMusicUrl] = useState<string | null>(null);
   const [musicName, setMusicName] = useState('Musique du Serveur');
+  // ⚠️ IMPORTANT: Start with isPlaying=false to respect browser autoplay policies
+  // Users must explicitly click play button first (browser requires user interaction for autoplay)
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(20);
 
@@ -83,7 +85,11 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         
         setMusicUrl(validUrl);
         setMusicName(data[0].music_name);
-        setIsPlaying(data[0].is_playing);
+        // ⚠️ DO NOT auto-play - browser policy requires user interaction
+        // Only sync database is_playing status, but don't force playback
+        if (data[0].is_playing && musicUrl) {
+          console.log('ℹ️ Musique en lecture côté serveur, en attente d\'interaction utilisateur');
+        }
         setVolume(data[0].volume);
       }
     } catch (error: any) {
