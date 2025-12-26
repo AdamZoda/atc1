@@ -452,45 +452,72 @@ const GamePage: React.FC<{ profile: Profile | null }> = ({ profile }) => {
           <p className="text-gray-400 text-center">Participez à la roulette et tentez de remporter le prix</p>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* LEFT: Waiting List */}
-          <div className="bg-white/5 border border-white/10 rounded-lg p-6">
-            <h2 className="text-lg font-cinzel font-bold text-white mb-4 flex items-center gap-2">
-              <Users size={20} className="text-luxury-gold" />
-              Liste d'attente
-            </h2>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {participants.filter((p) => p.status === 'WAITING').length > 0 ? (
-                participants
-                  .filter((p) => p.status === 'WAITING')
-                  .map((participant) => (
-                    <div key={participant.id} className="flex items-center justify-between bg-white/5 p-2 rounded border border-white/10">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <img
-                          src={participant.avatar_url || 'https://i.postimg.cc/rF1jc0R2/depositphotos-51405259-stock-illustration-male-avatar-profile-picture-use.jpg'}
-                          alt={participant.username}
-                          className="w-6 h-6 rounded-full"
-                        />
-                        <span className="text-xs text-white truncate">{participant.username}</span>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* LEFT: Waiting List + Accepted Users */}
+          <div className="lg:col-span-3 space-y-8">
+            {/* Waiting List */}
+            <div className="bg-white/5 border border-white/10 rounded-lg p-6">
+              <h2 className="text-lg font-cinzel font-bold text-white mb-4 flex items-center gap-2">
+                <Users size={20} className="text-luxury-gold" />
+                Liste d'attente
+              </h2>
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {participants.filter((p) => p.status === 'WAITING').length > 0 ? (
+                  participants
+                    .filter((p) => p.status === 'WAITING')
+                    .map((participant) => (
+                      <div key={participant.id} className="flex items-center justify-between bg-white/5 p-2 rounded border border-white/10">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <img
+                            src={participant.avatar_url || 'https://i.postimg.cc/rF1jc0R2/depositphotos-51405259-stock-illustration-male-avatar-profile-picture-use.jpg'}
+                            alt={participant.username}
+                            className="w-6 h-6 rounded-full"
+                          />
+                          <span className="text-xs text-white truncate">{participant.username}</span>
+                        </div>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleAcceptUser(participant.id)}
+                            className="text-luxury-gold hover:text-luxury-goldLight transition-colors ml-2"
+                          >
+                            <CheckCircle size={16} />
+                          </button>
+                        )}
                       </div>
-                      {isAdmin && (
-                        <button
-                          onClick={() => handleAcceptUser(participant.id)}
-                          className="text-luxury-gold hover:text-luxury-goldLight transition-colors ml-2"
-                        >
-                          <CheckCircle size={16} />
-                        </button>
-                      )}
+                    ))
+                ) : (
+                  <p className="text-gray-500 text-xs text-center py-4">Aucun en attente</p>
+                )}
+              </div>
+            </div>
+
+            {/* Accepted Users */}
+            <div className="bg-white/5 border border-white/10 rounded-lg p-6">
+              <h2 className="text-lg font-cinzel font-bold text-white mb-4 flex items-center gap-2">
+                <CheckCircle size={20} className="text-luxury-gold" />
+                Validés ({acceptedCount})
+              </h2>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {acceptedParticipants.length > 0 ? (
+                  acceptedParticipants.map((participant) => (
+                    <div key={participant.id} className="flex items-center gap-2 bg-white/5 p-2 rounded border border-white/10">
+                      <img
+                        src={participant.avatar_url || 'https://i.postimg.cc/rF1jc0R2/depositphotos-51405259-stock-illustration-male-avatar-profile-picture-use.jpg'}
+                        alt={participant.username}
+                        className="w-6 h-6 rounded-full"
+                      />
+                      <span className="text-xs text-white truncate flex-1">{participant.username}</span>
                     </div>
                   ))
-              ) : (
-                <p className="text-gray-500 text-xs text-center py-4">Aucun en attente</p>
-              )}
+                ) : (
+                  <p className="text-gray-500 text-xs text-center py-4">Aucun accepté</p>
+                )}
+              </div>
             </div>
           </div>
 
           {/* CENTER: ROULETTE */}
-          <div className="lg:col-span-2 flex flex-col items-center">
+          <div className="lg:col-span-5 flex flex-col items-center">
             <div className="bg-white/5 border border-white/10 rounded-lg p-8 w-full flex flex-col items-center">
               {/* Canvas Wheel */}
               <div className="relative mb-8">
@@ -544,8 +571,8 @@ const GamePage: React.FC<{ profile: Profile | null }> = ({ profile }) => {
             </div>
           </div>
 
-          {/* RIGHT: Admin Panel + Accepted */}
-          <div className="space-y-6">
+          {/* RIGHT: Admin Panel + Winners */}
+          <div className="lg:col-span-4 space-y-12">
             {/* Admin Panel */}
             {isAdmin && (
               <div className="bg-white/5 border border-white/10 rounded-lg p-6">
@@ -578,30 +605,6 @@ const GamePage: React.FC<{ profile: Profile | null }> = ({ profile }) => {
                 </div>
               </div>
             )}
-
-            {/* Accepted Users */}
-            <div className="bg-white/5 border border-white/10 rounded-lg p-6">
-              <h2 className="text-lg font-cinzel font-bold text-white mb-4 flex items-center gap-2">
-                <CheckCircle size={20} className="text-luxury-gold" />
-                Validés ({acceptedCount})
-              </h2>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {acceptedParticipants.length > 0 ? (
-                  acceptedParticipants.map((participant) => (
-                    <div key={participant.id} className="flex items-center gap-2 bg-white/5 p-2 rounded border border-white/10">
-                      <img
-                        src={participant.avatar_url || 'https://i.postimg.cc/rF1jc0R2/depositphotos-51405259-stock-illustration-male-avatar-profile-picture-use.jpg'}
-                        alt={participant.username}
-                        className="w-6 h-6 rounded-full"
-                      />
-                      <span className="text-xs text-white truncate flex-1">{participant.username}</span>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-gray-500 text-xs text-center py-4">Aucun accepté</p>
-                )}
-              </div>
-            </div>
 
             {/* Winners History */}
             <div className="bg-white/5 border border-white/10 rounded-lg p-6">

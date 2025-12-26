@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 // Fixed: Added AnimatePresence to the framer-motion import
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, Shield, Layout, Users, FileText, Image, LogIn, Globe } from 'lucide-react';
+import { Menu, X, Shield, Layout, Users, FileText, Image, LogIn } from 'lucide-react';
 import { Profile, NavLink } from '../types';
 import { siteConfig } from '../site-config';
 import { supabase } from '../supabaseClient';
@@ -21,7 +21,7 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
   const [fallbackName, setFallbackName] = useState<string | null>(null);
   const [isGamePageVisible, setIsGamePageVisible] = useState(true);
   const location = useLocation();
-  const { language, setLanguage, t } = useLanguage();
+  const { t } = useLanguage();
   const { isPageVisible } = usePageVisibility();
 
   const getNavLinks = (): NavLink[] => {
@@ -140,17 +140,6 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
 
         {/* Auth Actions */}
         <div className="hidden md:flex items-center gap-2 md:gap-4 flex-shrink-0">
-          {/* Language Switcher */}
-          <div className="flex items-center gap-1 md:gap-2 px-2 md:px-3 py-2 rounded-lg bg-white/5 border border-white/10">
-            <Globe size={14} className="text-luxury-gold flex-shrink-0" />
-            <button
-              onClick={() => setLanguage(language === 'en' ? 'fr' : 'en')}
-              className="px-1 md:px-2 py-1 text-xs md:text-sm font-semibold transition-all hover:text-luxury-gold"
-            >
-              {language.toUpperCase()}
-            </button>
-          </div>
-
           {profile ? (
             <div className="flex items-center gap-2 md:gap-4">
               <Link to="/profile" className="flex items-center gap-2 md:gap-3">
