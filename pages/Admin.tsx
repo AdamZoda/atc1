@@ -1871,6 +1871,7 @@ const Admin: React.FC = () => {
                   'page-game': '🎮 Jeu',
                   'page-shop': '🛍️ Shop',
                   'page-gallery': '🎨 Galerie',
+                  'About': 'ℹ️ À propos',
                 }).map(([pageId, label]) => (
                   <div
                     key={pageId}

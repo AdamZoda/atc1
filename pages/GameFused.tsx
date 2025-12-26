@@ -454,7 +454,7 @@ const GamePage: React.FC<{ profile: Profile | null }> = ({ profile }) => {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* LEFT: Waiting List + Accepted Users */}
-          <div className="lg:col-span-3 space-y-8">
+          <div className="lg:col-span-4 space-y-6">
             {/* Waiting List */}
             <div className="bg-white/5 border border-white/10 rounded-lg p-6">
               <h2 className="text-lg font-cinzel font-bold text-white mb-4 flex items-center gap-2">
@@ -517,7 +517,7 @@ const GamePage: React.FC<{ profile: Profile | null }> = ({ profile }) => {
           </div>
 
           {/* CENTER: ROULETTE */}
-          <div className="lg:col-span-5 flex flex-col items-center">
+          <div className="lg:col-span-4 flex flex-col items-center">
             <div className="bg-white/5 border border-white/10 rounded-lg p-8 w-full flex flex-col items-center">
               {/* Canvas Wheel */}
               <div className="relative mb-8">

@@ -4,6 +4,7 @@ import { Server, Users, MessageSquare, Mail, Ticket, ChevronDown, ChevronUp } fr
 import { useLanguage } from '../LanguageContext';
 import { siteConfig } from '../site-config';
 import { supabase } from '../supabaseClient';
+import AccessControl from '../components/AccessControl';
 
 const About: React.FC = () => {
   const { t } = useLanguage();
@@ -344,12 +345,13 @@ const About: React.FC = () => {
   ];
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="relative min-h-screen pt-28 md:pt-32 lg:pt-36"
-    >
+    <AccessControl pageName="About">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="relative min-h-screen pt-28 md:pt-32 lg:pt-36"
+      >
       {/* HEADER SECTION */}
       <div className="relative py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-6xl mx-auto text-center">
@@ -910,7 +912,8 @@ const About: React.FC = () => {
 
       {/* Spacing */}
       <div className="h-20" />
-    </motion.div>
+      </motion.div>
+    </AccessControl>
   );
 };
 
