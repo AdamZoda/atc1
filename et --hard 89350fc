@@ -1,0 +1,25 @@
+[33m31ebdff[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m final MISE A JOUR
+[33m89350fc[m MISE A JOUR
+[33m9a17056[m name MISE A JOUR
+[33me7bb132[m navbr MISE A JOUR
+[33m1899f62[m top MISE A JOUR
+[33m37781c9[m full MISE A JOUR
+[33mfd58ac7[m DISCORD2 MISE A JOUR
+[33m1c24c18[m DISCORD MISE A JOUR
+[33md1863cb[m V5 BIG MISE A JOUR
+[33md122cdd[m V4 BIG MISE A JOUR
+[33m0a31c20[m BIG MISE A JOUR
+[33m82cde4f[m  Features: Geolocation Optimization + Game Page (Spinner Wheel)
+[33med8109b[m Normalize line endings
+[33mc3094c3[m Security: Refetsh
+[33m3b8c1f5[m Security: Remove exposed environment variables
+[33m1757edc[m Use VITE_APP_URL for OAuth redirect; document in .env.example
+[33m39c8ff2[m DISCORD
+[33m2392da9[m Add .gitattributes and normalize line endings
+[33m0f7dc5a[m IMAE IMG MODIFY
+[33ma3aff47[m ATC IMG MODIFY
+[33m88dbb29[m merge: Keep latest version with auto-refresh and Shop page enhancements
+[33m6cb8137[m feat: Add auto-refresh for users, enhanced Shop page with red design and floating unavailable notification
+[33m6a6694a[m new admin interface v0
+[33mf26956b[m feat: Initialize project structure and configuration
+[33m5e1a6f2[m Initial commit
