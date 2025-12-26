@@ -395,7 +395,7 @@ const Admin: React.FC = () => {
 
       await fetchBackgroundHistory();
     } catch (err: any) {
-      alert(`Erreur: ${err.message}`);
+      showToast(`❌ Erreur: ${err.message}`);
     } finally {
       setBgSubmitting(false);
     }
@@ -491,7 +491,7 @@ const Admin: React.FC = () => {
         fetchUsers();
       }
     } else {
-      alert(`Erreur: ${error.message}`);
+      showToast(`❌ Erreur: ${error.message}`);
     }
   };
 
@@ -1005,7 +1005,28 @@ const Admin: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setTickets(data || []);
+      
+      // Enrichir les tickets avec le display_name depuis les profils
+      const enrichedTickets = await Promise.all(
+        (data || []).map(async (ticket: any) => {
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('display_name, username')
+              .eq('id', ticket.user_id)
+              .single();
+            
+            return {
+              ...ticket,
+              display_name: profile?.display_name || profile?.username || ticket.username || 'Utilisateur'
+            };
+          } catch (err) {
+            return ticket;
+          }
+        })
+      );
+      
+      setTickets(enrichedTickets);
     } catch (error) {
       console.error('Error fetching tickets:', error);
     } finally {
@@ -2443,11 +2464,11 @@ const Admin: React.FC = () => {
                   if (window.confirm('⚠️ Êtes-vous sûr ? Cela bloquera TOUS les utilisateurs')) {
                     const { error } = await supabase.from('profiles').update({ can_edit_profile: false }).gte('created_at', '1900-01-01');
                     if (!error) {
-                      alert('✅ Tous les profils sont bloqués');
+                      showToast('✅ Tous les profils sont bloqués');
                       await logAdminAction('bulk_block_profiles', '🔒 Tous les profils ont été bloqués', 'config', 'bulk');
                       fetchUsers();
                     } else {
-                      alert('❌ Erreur: ' + error.message);
+                      showToast('❌ Erreur: ' + error.message);
                     }
                   }
                 }}
@@ -2463,11 +2484,11 @@ const Admin: React.FC = () => {
                   if (window.confirm('✅ Êtes-vous sûr ? Cela débloquera TOUS les utilisateurs')) {
                     const { error } = await supabase.from('profiles').update({ can_edit_profile: true }).gte('created_at', '1900-01-01');
                     if (!error) {
-                      alert('✅ Tous les profils sont débloqués');
+                      showToast('✅ Tous les profils sont débloqués');
                       await logAdminAction('bulk_unlock_profiles', '🔓 Tous les profils ont été débloqués', 'config', 'bulk');
                       fetchUsers();
                     } else {
-                      alert('❌ Erreur: ' + error.message);
+                      showToast('❌ Erreur: ' + error.message);
                     }
                   }
                 }}
@@ -2638,7 +2659,7 @@ const Admin: React.FC = () => {
                           }`}
                         >
                           <p className="text-sm font-bold text-white truncate">
-                            {ticket.username || 'Anonyme'}
+                            {ticket.display_name || ticket.username || 'Anonyme'}
                           </p>
                           <p className="text-xs text-gray-400 truncate mt-1">
                             {ticket.description?.substring(0, 50)}...
@@ -2668,7 +2689,7 @@ const Admin: React.FC = () => {
                     <div className="flex items-start justify-between mb-6">
                       <div>
                         <h4 className="text-2xl font-bold text-white mb-2">
-                          {selectedTicket.username || 'Anonyme'}
+                          {selectedTicket.display_name || selectedTicket.username || 'Anonyme'}
                         </h4>
                         <p className="text-gray-400 text-sm">
                           ID: {selectedTicket.id.substring(0, 8)}...
@@ -3043,3 +3064,5 @@ const Admin: React.FC = () => {
 };
 
 export default Admin;
+
+

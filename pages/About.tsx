@@ -569,7 +569,7 @@ const About: React.FC = () => {
                   </label>
                   <div className="p-3 bg-white/5 border border-white/10 rounded-lg">
                     <p className="text-white font-semibold">
-                      {userProfile?.username || 'Utilisateur'}
+                      {userProfile?.display_name || userProfile?.username || 'Utilisateur'}
                     </p>
                   </div>
                 </div>
