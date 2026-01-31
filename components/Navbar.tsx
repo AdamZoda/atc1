@@ -19,7 +19,6 @@ const DEFAULT_AVATAR = 'https://i.postimg.cc/rF1jc0R2/depositphotos-51405259-sto
 const Navbar: React.FC<NavbarProps> = ({ profile }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [fallbackName, setFallbackName] = useState<string | null>(null);
-  const [isGamePageVisible, setIsGamePageVisible] = useState(true);
   const location = useLocation();
   const { t } = useLanguage();
   const { isPageVisible } = usePageVisibility();
@@ -31,8 +30,7 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
       { label: t('nav.rules'), path: '/rules', visible: isPageVisible('Rules') },
       { label: 'À propos', path: '/about', visible: isPageVisible('About') },
       { label: t('nav.community'), path: '/community', visible: isPageVisible('Community') },
-      { label: 'Chat', path: '/chat', visible: true },
-      ...(isPageVisible('Game') || profile?.role === 'admin' ? [{ label: 'Jeu', path: '/game', visible: true }] : []),
+      { label: 'Chat', path: '/chat', visible: !!profile && isPageVisible('Chat') },
       { label: 'Shop', path: '/shop', visible: isPageVisible('Shop') },
       { label: t('nav.media'), path: '/media', restricted: true, visible: isPageVisible('Gallery') },
     ];
@@ -72,38 +70,6 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
     }
   }, [profile]);
 
-  // Fetch game page visibility
-  useEffect(() => {
-    const fetchGamePageVisibility = async () => {
-      try {
-        const { data } = await supabase
-          .from('game_admin_settings')
-          .select('page_visible')
-          .eq('id', 'game-settings')
-          .single();
-
-        if (data) {
-          setIsGamePageVisible(data.page_visible ?? true);
-        }
-      } catch (error) {
-        console.error('Error fetching game page visibility:', error);
-      }
-    };
-
-    fetchGamePageVisibility();
-
-    // Subscribe to real-time updates
-    const subscription = supabase
-      .channel('public:game_admin_settings')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'game_admin_settings' }, () =>
-        fetchGamePageVisibility()
-      )
-      .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
 
   return (
     <nav className="fixed w-full z-50 px-2 py-4 md:px-10">

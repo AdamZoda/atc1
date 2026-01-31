@@ -22,7 +22,8 @@ import {
     CheckCircle,
     Copy,
     Check,
-    Trash2
+    Trash2,
+    Shield
 } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { format } from 'date-fns';
@@ -95,22 +96,32 @@ const Chat: React.FC = () => {
         fetchUserAndRooms();
     }, []);
 
+    // 1. Subscription for NEW messages and Room updates (Global)
     useEffect(() => {
-        if (!activeRoom) return;
-        const channel = supabase
-            .channel('chat_updates')
+        const globalChannel = supabase
+            .channel('global_chat_updates')
             .on('postgres_changes' as any, {
                 event: 'INSERT',
                 table: 'chat_messages'
             }, (payload: any) => {
                 const msg = payload.new as Message;
-                if (activeRoom && msg.room_id === activeRoom.id) {
-                    fetchMessageWithProfile(msg);
-                }
-                // Update last message in room list
+                // Update last message in room list for everyone
                 setRooms(prev => prev.map(r =>
                     r.id === msg.room_id ? { ...r, last_message: msg.content } : r
                 ));
+                // If it's for our active room
+                if (activeRoom && msg.room_id === activeRoom.id) {
+                    fetchMessageWithProfile(msg);
+                }
+            })
+            .on('postgres_changes' as any, {
+                event: 'INSERT',
+                table: 'chat_rooms'
+            }, (payload: any) => {
+                const newRoom = payload.new as Room;
+                if (newRoom.is_public || newRoom.type === 'general') {
+                    fetchUserAndRooms();
+                }
             })
             .on('postgres_changes' as any, {
                 event: 'UPDATE',
@@ -118,16 +129,45 @@ const Chat: React.FC = () => {
             }, (payload: any) => {
                 const updatedRoom = payload.new as Room;
                 if (activeRoom && updatedRoom.id === activeRoom.id) {
-                    setActiveRoom(prev => prev ? { ...prev, is_locked: updatedRoom.is_locked } : null);
+                    setActiveRoom(prev => prev ? { ...prev, is_locked: updatedRoom.is_locked, name: updatedRoom.name, description: updatedRoom.description, is_public: updatedRoom.is_public } : null);
                 }
-                setRooms(prev => prev.map(r => r.id === updatedRoom.id ? { ...r, is_locked: updatedRoom.is_locked } : r));
+                setRooms(prev => prev.map(r => r.id === updatedRoom.id ? { ...r, is_locked: updatedRoom.is_locked, name: updatedRoom.name, description: updatedRoom.description, is_public: updatedRoom.is_public } : r));
+
+                if (updatedRoom.is_public) fetchUserAndRooms();
             })
             .subscribe();
 
         return () => {
-            supabase.removeChannel(channel);
+            supabase.removeChannel(globalChannel);
         };
     }, [activeRoom?.id]);
+
+    // 2. Subscription for MY participation (Private chats/Group invites)
+    useEffect(() => {
+        if (!currentUser) return;
+
+        const participantChannel = supabase
+            .channel(`my_participation_${currentUser.id}`)
+            .on('postgres_changes' as any, {
+                event: 'INSERT',
+                table: 'chat_participants',
+                filter: `user_id=eq.${currentUser.id}`
+            }, () => {
+                fetchUserAndRooms();
+            })
+            .on('postgres_changes' as any, {
+                event: 'DELETE',
+                table: 'chat_participants',
+                filter: `user_id=eq.${currentUser.id}`
+            }, () => {
+                fetchUserAndRooms();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(participantChannel);
+        };
+    }, [currentUser?.id]);
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -289,12 +329,17 @@ const Chat: React.FC = () => {
             return;
         }
         try {
-            const { data } = await supabase
+            let queryBuilder = supabase
                 .from('profiles')
                 .select('*')
                 .or(`username.ilike.%${query}%,display_name.ilike.%${query}%`)
-                .neq('id', currentUser?.id)
                 .limit(5);
+
+            if (currentUser?.id) {
+                queryBuilder = queryBuilder.neq('id', currentUser.id);
+            }
+
+            const { data } = await queryBuilder;
             if (data) setUserSearchResults(data);
         } catch (err) {
             console.error('Error searching users:', err);
@@ -769,9 +814,11 @@ const Chat: React.FC = () => {
                             >
                                 <div className="relative">
                                     {room.type === 'general' ? (
-                                        <div className="w-14 h-14 rounded-2xl bg-luxury-gold/20 flex items-center justify-center text-luxury-gold border border-luxury-gold/30">
-                                            <Hash size={24} />
-                                        </div>
+                                        <img
+                                            src="https://i.postimg.cc/L4wgGYg6/ATC.png"
+                                            className="w-14 h-14 rounded-2xl object-cover border border-luxury-gold/30 shadow-lg shadow-luxury-gold/5"
+                                            alt="ATC"
+                                        />
                                     ) : room.type === 'group' ? (
                                         <div className="w-14 h-14 rounded-2xl bg-blue-500/20 flex items-center justify-center text-blue-400 border border-blue-500/30">
                                             <MessageSquare size={24} />
@@ -831,9 +878,11 @@ const Chat: React.FC = () => {
                                         }}
                                     >
                                         {activeRoom.type === 'general' ? (
-                                            <div className="w-12 h-12 rounded-xl bg-luxury-gold/20 flex items-center justify-center text-luxury-gold border border-luxury-gold/30">
-                                                <Hash size={20} />
-                                            </div>
+                                            <img
+                                                src="https://i.postimg.cc/L4wgGYg6/ATC.png"
+                                                className="w-12 h-12 rounded-xl object-cover border border-luxury-gold/30"
+                                                alt="ATC"
+                                            />
                                         ) : activeRoom.type === 'group' ? (
                                             <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400 border border-blue-500/30">
                                                 <MessageSquare size={20} />
@@ -1058,9 +1107,11 @@ const Chat: React.FC = () => {
                                                 <div className="p-8 flex flex-col items-center border-b border-white/5 bg-gradient-to-b from-white/5 to-transparent">
                                                     <div className="relative group mb-6">
                                                         {activeRoom.type === 'general' ? (
-                                                            <div className="w-40 h-40 rounded-[3rem] bg-luxury-gold/20 flex items-center justify-center text-luxury-gold border-2 border-luxury-gold/30 shadow-2xl">
-                                                                <Hash size={64} />
-                                                            </div>
+                                                            <img
+                                                                src="https://i.postimg.cc/L4wgGYg6/ATC.png"
+                                                                className="w-40 h-40 rounded-[3rem] object-cover border-2 border-luxury-gold/30 shadow-2xl"
+                                                                alt="ATC"
+                                                            />
                                                         ) : activeRoom.type === 'group' ? (
                                                             <div className="w-40 h-40 rounded-[3rem] bg-blue-500/20 flex items-center justify-center text-blue-400 border-2 border-blue-500/30 shadow-2xl">
                                                                 <MessageSquare size={64} />

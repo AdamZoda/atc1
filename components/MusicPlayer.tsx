@@ -8,14 +8,14 @@ const MusicPlayer: React.FC = () => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [localVolume, setLocalVolume] = useState(20);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
-  const [showPlayerBar, setShowPlayerBar] = useState(true);
+  const [showPlayerBar, setShowPlayerBar] = useState(false);
   const [previousUrl, setPreviousUrl] = useState<string | null>(null);
   const [isLoadingUrl, setIsLoadingUrl] = useState(false);
 
   // Mettre à jour la source audio UNIQUEMENT quand l'URL change réellement
   useEffect(() => {
     if (!audioRef.current) return;
-    
+
     // Si l'URL n'a pas changé, ne rien faire
     if (musicUrl === previousUrl) {
       return;
@@ -24,16 +24,16 @@ const MusicPlayer: React.FC = () => {
     // Si nouvelle URL
     if (musicUrl && musicUrl.trim() !== '') {
       setIsLoadingUrl(true);
-      
+
       // Arrêter la musique précédente
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
-      
+
       // Charger la nouvelle
       audioRef.current.src = musicUrl;
       audioRef.current.load();
       console.log('🎵 Nouvelle URL audio chargée:', musicUrl);
-      
+
       setPreviousUrl(musicUrl);
       setIsLoadingUrl(false);
     } else {

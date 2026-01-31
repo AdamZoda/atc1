@@ -52,12 +52,12 @@ const Home: React.FC = () => {
       try {
         // Ajout d'un timestamp pour forcer le rafraîchissement (anti-cache)
         const timestamp = new Date().getTime();
-        const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(`https://servers-frontend.fivem.net/api/servers/single/vzbjxk?t=${timestamp}`)}`);
+        const apiUri = `https://servers-frontend.fivem.net/api/servers/single/vzbjxk?t=${timestamp}`;
+        const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(apiUri)}`);
         if (!response.ok) return;
 
         const json = await response.json();
-        const result = JSON.parse(json.contents);
-        const data = result.Data;
+        const data = json.Data;
 
         if (data) {
           setServerStats({

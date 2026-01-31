@@ -1,7 +1,7 @@
 
 import React, { Suspense, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, useGLTF, Environment, ContactShadows, Float, Center } from '@react-three/drei';
+import { OrbitControls, useGLTF, Environment, ContactShadows, Float, AdaptiveDpr, Preload } from '@react-three/drei';
 import * as THREE from 'three';
 
 const Model = () => {
@@ -30,43 +30,46 @@ const Scene3D = () => {
     return (
         <div className="w-full h-full min-h-[400px] lg:min-h-[600px] relative z-10 cursor-move">
             <Canvas
-                shadows
+                shadows={false} // Disable active shadows to gain performance
+                dpr={[1, 1.5]} // Limit pixel ratio for high DPI screens
                 camera={{ position: [0, 2, 8], fov: 45 }}
                 className="w-full h-full"
-                gl={{ alpha: true, antialias: true }}
+                gl={{
+                    alpha: true,
+                    antialias: false, // Disable for better performance, use post-processing if needed
+                    powerPreference: "high-performance",
+                    preserveDrawingBuffer: false
+                }}
+                performance={{ min: 0.5 }} // Allow the scene to scale down on heavy load
             >
-                <ambientLight intensity={0.5} />
-                <spotLight
-                    position={[10, 10, 10]}
-                    angle={0.15}
-                    penumbra={1}
-                    intensity={1}
-                    castShadow
-                />
+                <ambientLight intensity={0.7} />
+                <pointLight position={[10, 10, 10]} intensity={1} />
 
                 <Suspense fallback={null}>
                     <Float
-                        speed={2}
-                        rotationIntensity={0.2}
-                        floatIntensity={0.5}
-                        floatingRange={[-0.1, 0.1]}
+                        speed={1.5}
+                        rotationIntensity={0.1}
+                        floatIntensity={0.3}
+                        floatingRange={[-0.05, 0.05]}
                     >
                         <Model />
                     </Float>
                     <Environment preset="city" />
                     <ContactShadows
                         position={[0, -1.5, 0]}
-                        opacity={0.4}
-                        scale={10}
-                        blur={2.5}
+                        opacity={0.3}
+                        scale={8}
+                        blur={3}
                         far={4}
+                        frames={1} // Only render shadows once
                     />
+                    <AdaptiveDpr pixelated />
+                    <Preload all />
                 </Suspense>
 
                 <OrbitControls
                     enableZoom={false}
                     enablePan={false}
-                    autoRotate={false} // Disabled orbit in favor of local rotation
                     minPolarAngle={Math.PI / 2.5}
                     maxPolarAngle={Math.PI / 1.5}
                 />

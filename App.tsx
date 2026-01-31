@@ -22,7 +22,6 @@ import Login from './pages/Login';
 
 import AuthCallback from './pages/AuthCallback';
 import ProfilePage from './pages/Profile';
-import GamePage from './pages/Game';
 import Chat from './pages/Chat';
 
 // Components
@@ -62,8 +61,7 @@ const AppContent = () => {
         await supabase
           .from('profiles')
           .update({
-            last_seen: new Date().toISOString(),
-            is_online: true
+            last_seen: new Date().toISOString()
           })
           .eq('id', currentSession.user.id);
       }
@@ -247,7 +245,6 @@ const AppContent = () => {
               <Route path="/rules" element={<Rules />} />
               <Route path="/about" element={<About />} />
               <Route path="/community" element={<Community />} />
-              <Route path="/game" element={<GamePage profile={profile} />} />
               <Route path="/shop" element={<Shop />} />
 
               {/* Protected Routes */}

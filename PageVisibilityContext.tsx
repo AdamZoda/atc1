@@ -42,10 +42,10 @@ export const PageVisibilityProvider: React.FC<{ children: ReactNode }> = ({ chil
           Features: true,
           Rules: true,
           Community: true,
-          Game: true,
           Shop: true,
           Gallery: true,
           About: true,
+          Chat: true,
         });
       } finally {
         setLoading(false);

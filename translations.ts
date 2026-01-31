@@ -147,16 +147,6 @@ export const translations = {
       stayInformed: 'Stay Informed',
       subscribeDiscord: 'Subscribe to our Discord to be notified when the shop opens',
       joinDiscord: 'Join Discord',
-    },    // Game
-    game: {
-      title: 'Game',
-      register: 'Register to Participate',
-      waiting: 'Waiting',
-      launch: 'Launch',
-      winner: 'Winner!',
-      chat: 'Community Chat',
-      acceptAll: 'Accept All',
-      winners: 'Winners',
     },
   },
   fr: {
@@ -305,17 +295,6 @@ export const translations = {
       stayInformed: 'Restez Informé',
       subscribeDiscord: 'Abonnez-vous à notre Discord pour être notifié de l\'ouverture de la boutique',
       joinDiscord: 'Rejoindre Discord',
-    },
-    // Game
-    game: {
-      title: 'Jeu',
-      register: 'S\'inscrire pour participer',
-      waiting: 'En attente',
-      launch: 'Lancer',
-      winner: 'Gagnant!',
-      chat: 'Chat Communautaire',
-      acceptAll: 'Accepter tous',
-      winners: 'Gagnants',
     },
   },
 };

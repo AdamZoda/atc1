@@ -396,7 +396,7 @@ const Admin: React.FC = () => {
   // Post form state
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [mediaUrl, setMediaUrl] = useState('');
+  const [mediaUrls, setMediaUrls] = useState<string[]>(['']);
   const [mediaType, setMediaType] = useState<'image' | 'video' | 'file'>('image');
   const [submitting, setSubmitting] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
@@ -752,7 +752,7 @@ const Admin: React.FC = () => {
       if (data) {
         const visibilities: { [key: string]: boolean } = {};
         data.forEach((page: any) => {
-          visibilities[page.id] = page.is_visible;
+          visibilities[page.page_name] = page.is_visible;
         });
         setPageVisibilities(visibilities);
       }
@@ -767,11 +767,40 @@ const Admin: React.FC = () => {
       console.log('🔄 DÉBUT UPDATE - pageId:', pageId, 'isVisible:', isVisible);
       console.log('📤 Envoi de la requête Supabase UPDATE...');
 
-      // Utiliser l'UPDATE direct (RLS disabled)
-      const { error } = await supabase
+      // 1. On récupère tout pour être sûr de trouver le bon enregistrement (il y en a peu)
+      const { data: records } = await supabase
         .from('page_visibility')
-        .update({ is_visible: isVisible })
-        .eq('id', pageId);
+        .select('id, page_name');
+
+      const existing = records?.find(r =>
+        r.page_name === pageId ||
+        r.id === pageId ||
+        r.id === `page-${pageId.toLowerCase()}`
+      );
+
+      console.log('🔍 Résultat de la recherche locale:', existing);
+
+      let finalError;
+      if (existing) {
+        console.log('📝 Mise à jour de la ligne ID:', existing.id);
+        const { error: updateError } = await supabase
+          .from('page_visibility')
+          .update({ is_visible: isVisible, page_name: pageId })
+          .eq('id', existing.id);
+        finalError = updateError;
+      } else {
+        console.log('➕ Insertion nouvelle ligne pour:', pageId);
+        const { error: insertError } = await supabase
+          .from('page_visibility')
+          .insert({
+            id: pageId, // On utilise le nom de la page comme ID pour éviter l'erreur de contrainte NOT NULL
+            page_name: pageId,
+            is_visible: isVisible
+          });
+        finalError = insertError;
+      }
+
+      const error = finalError;
 
       console.log('✅ RÉPONSE SUPABASE - error:', error);
 
@@ -781,29 +810,27 @@ const Admin: React.FC = () => {
       }
 
       console.log('✨ Mise à jour UI locale...');
-      setPageVisibilities((prev) => ({
-        ...prev,
-        [pageId]: isVisible,
-      }));
+      await fetchPageVisibilities();
 
       console.log('✅ SUCCESS COMPLET');
 
       // Log l'action
       const pageNames: { [key: string]: string } = {
-        'page-home': 'Accueil',
-        'page-features': 'Fonctionnalités',
-        'page-rules': 'Règles',
-        'page-community': 'Communauté',
-        'page-game': 'Jeu',
-        'page-shop': 'Shop',
-        'page-gallery': 'Galerie'
+        'Home': 'Accueil',
+        'Features': 'Fonctionnalités',
+        'Rules': 'Règles',
+        'Community': 'Communauté',
+        'Shop': 'Shop',
+        'Gallery': 'Galerie',
+        'About': 'À propos',
+        'Chat': 'Chat'
       };
       const pageName = pageNames[pageId] || pageId;
       const action = isVisible ? '👁️ a rendu visible' : '🚫 a caché';
       await logAdminAction('page_visibility', `${action} la page ${pageName}`, 'page', pageName, { isVisible });
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ ERREUR COMPLÈTE:', error);
-      console.log('Erreur lors de la mise à jour: ' + (error as any).message);
+      alert('Erreur lors de la mise à jour: ' + (error.message || 'Erreur inconnue'));
     } finally {
       setPageVisibilityLoading(false);
     }
@@ -1058,7 +1085,11 @@ const Admin: React.FC = () => {
 
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !content || !mediaUrl) return console.log('Remplissez tous les champs (URL requise)');
+    const finalMediaUrl = mediaUrls.filter(u => u.trim()).length > 1
+      ? JSON.stringify(mediaUrls.filter(u => u.trim()))
+      : (mediaUrls.filter(u => u.trim())[0] || '');
+
+    if (!title || !content || !finalMediaUrl) return console.log('Remplissez tous les champs (URL requise)');
 
     setSubmitting(true);
     try {
@@ -1068,7 +1099,7 @@ const Admin: React.FC = () => {
           title,
           content,
           media_type: mediaType,
-          media_url: mediaUrl
+          media_url: finalMediaUrl
         }])
         .select();
 
@@ -1079,7 +1110,7 @@ const Admin: React.FC = () => {
       await logAdminAction('create_post', `📝 Création d'un nouveau post "${title}"`, 'post', title);
       setTitle('');
       setContent('');
-      setMediaUrl('');
+      setMediaUrls(['']);
       setMediaType('image');
       fetchPosts();
     } catch (err: any) {
@@ -1113,7 +1144,16 @@ const Admin: React.FC = () => {
     setEditingPost(post);
     setTitle(post.title);
     setContent(post.content);
-    setMediaUrl(post.media_url);
+    // Check if it's a JSON array
+    try {
+      if (post.media_url.startsWith('[')) {
+        setMediaUrls(JSON.parse(post.media_url));
+      } else {
+        setMediaUrls([post.media_url]);
+      }
+    } catch {
+      setMediaUrls([post.media_url]);
+    }
     setMediaType(post.media_type as any);
   };
 
@@ -1121,14 +1161,18 @@ const Admin: React.FC = () => {
     setEditingPost(null);
     setTitle('');
     setContent('');
-    setMediaUrl('');
+    setMediaUrls(['']);
     setMediaType('image');
   };
 
   const handleUpdatePost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingPost) return;
-    if (!title || !content || !mediaUrl) return console.log('Remplissez tous les champs');
+    const finalMediaUrl = mediaUrls.filter(u => u.trim()).length > 1
+      ? JSON.stringify(mediaUrls.filter(u => u.trim()))
+      : (mediaUrls.filter(u => u.trim())[0] || '');
+
+    if (!title || !content || !finalMediaUrl) return console.log('Remplissez tous les champs');
 
     setSubmitting(true);
     try {
@@ -1138,7 +1182,7 @@ const Admin: React.FC = () => {
           title,
           content,
           media_type: mediaType,
-          media_url: mediaUrl
+          media_url: finalMediaUrl
         })
         .eq('id', editingPost.id);
 
@@ -1293,12 +1337,12 @@ const Admin: React.FC = () => {
         category_id: selectedCategoryId,
         title: newRuleTitle,
         content: newRuleContent,
-        order: rules.filter(r => r.category_id === selectedCategoryId).length + 1,
+        order: rules.filter(r => Number(r.category_id) === Number(selectedCategoryId)).length + 1,
       });
 
     if (!error) {
       // Log l'action
-      const category = categories.find(c => c.id === selectedCategoryId);
+      const category = categories.find(c => Number(c.id) === Number(selectedCategoryId));
       const categoryName = category?.name || 'Catégorie inconnue';
       await logAdminAction('add_rule', `📋 Ajout d'une nouvelle règle "${newRuleTitle}" dans "${categoryName}"`, 'rule', newRuleTitle);
       setNewRuleTitle('');
@@ -2087,9 +2131,8 @@ const Admin: React.FC = () => {
               </div>
             </div>
 
-            {/* Grille de cartes utilisateurs */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {users
+            {(() => {
+              const filteredUsers = users
                 .filter(user => {
                   const s = searchTerm.toLowerCase();
                   const matchSearch =
@@ -2112,26 +2155,63 @@ const Admin: React.FC = () => {
                   const aOnline = a.last_seen && (Date.now() - new Date(a.last_seen).getTime() < 120000);
                   const bOnline = b.last_seen && (Date.now() - new Date(b.last_seen).getTime() < 120000);
 
-                  // Online users FIRST
                   if (aOnline && !bOnline) return -1;
                   if (!aOnline && bOnline) return 1;
 
-                  // Then by last seen
                   const dateA = a.last_seen ? new Date(a.last_seen).getTime() : 0;
                   const dateB = b.last_seen ? new Date(b.last_seen).getTime() : 0;
                   return dateB - dateA;
-                })
-                .map(user => (
-                  <UserCard
-                    key={user.id}
-                    user={user}
-                    onClick={(u) => {
-                      setSelectedUser(u);
-                      setIsSidePanelOpen(true);
-                    }}
-                  />
-                ))}
-            </div>
+                });
+
+              return (
+                <>
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-luxury-gold/10 rounded-lg">
+                        <Users className="text-luxury-gold" size={24} />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-white tracking-tight">Gestion des Utilisateurs</h2>
+                        <p className="text-sm text-gray-400">{filteredUsers.length} utilisateurs trouvés</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleGlobalSync}
+                        className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-xl border border-indigo-500/20 text-xs font-black uppercase transition-all"
+                        title="Synchroniser avatars & IDs Discord pour tous les users"
+                      >
+                        <RefreshCcw size={14} className={loading ? 'animate-spin' : ''} />
+                        Sync Global
+                      </button>
+                      <button
+                        onClick={() => setIsOnlineOnly(!isOnlineOnly)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-black uppercase transition-all ${isOnlineOnly
+                          ? 'bg-green-500/20 border-green-500/40 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.1)]'
+                          : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                          }`}
+                      >
+                        <div className={`w-2 h-2 rounded-full ${isOnlineOnly ? 'bg-green-400 animate-pulse' : 'bg-gray-600'}`}></div>
+                        En ligne uniquement
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {filteredUsers.map(user => (
+                      <UserCard
+                        key={user.id}
+                        user={user}
+                        onClick={(u) => {
+                          setSelectedUser(u);
+                          setIsSidePanelOpen(true);
+                        }}
+                      />
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
 
             {/* Panneau latéral de détails */}
             <UserSidePanel
@@ -2182,18 +2262,52 @@ const Admin: React.FC = () => {
                   <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Description</label>
                   <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={4} className="w-full px-6 py-4 rounded-xl bg-black border border-white/10 focus:border-luxury-gold transition-all text-white outline-none resize-none" placeholder="Racontez la scène..." />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <div>
-                    <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Type</label>
+                    <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">Type de média principal</label>
                     <select value={mediaType} onChange={(e) => setMediaType(e.target.value as any)} className="w-full px-6 py-4 rounded-xl bg-black border border-white/10 focus:border-luxury-gold text-white outline-none">
-                      <option value="image">Image</option>
+                      <option value="image">Image / Album</option>
                       <option value="video">Vidéo</option>
                       <option value="file">Fichier</option>
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">URL du Média</label>
-                    <input type="url" value={mediaUrl} onChange={(e) => setMediaUrl(e.target.value)} required className="w-full px-6 py-4 rounded-xl bg-black border border-white/10 focus:border-luxury-gold transition-all text-white outline-none text-sm" placeholder="https://example.com/image.jpg" />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-widest text-gray-400 mb-2">URLs des Médias (Ajoutez-en plusieurs pour créer un album)</label>
+                  <div className="space-y-3">
+                    {mediaUrls.map((url, index) => (
+                      <div key={index} className="flex gap-2">
+                        <input
+                          type="url"
+                          value={url}
+                          onChange={(e) => {
+                            const newUrls = [...mediaUrls];
+                            newUrls[index] = e.target.value;
+                            setMediaUrls(newUrls);
+                          }}
+                          required={index === 0}
+                          className="flex-1 px-6 py-4 rounded-xl bg-black border border-white/10 focus:border-luxury-gold transition-all text-white outline-none text-sm"
+                          placeholder={`Lien image #${index + 1} (JPG, PNG, GIF...)`}
+                        />
+                        {mediaUrls.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setMediaUrls(mediaUrls.filter((_, i) => i !== index))}
+                            className="p-4 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20 transition-all border border-red-500/20"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setMediaUrls([...mediaUrls, ''])}
+                      className="w-full py-3 bg-white/5 border border-dashed border-white/20 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all text-xs font-bold uppercase tracking-widest"
+                    >
+                      + Ajouter une autre image à l'album
+                    </button>
                   </div>
                 </div>
                 <div className="flex gap-3">
@@ -2234,7 +2348,20 @@ const Admin: React.FC = () => {
                     <div key={post.id} className="glass p-6 rounded-2xl border border-white/5 hover:border-luxury-gold/30 transition-all">
                       <div className="aspect-video bg-black/50 rounded-xl overflow-hidden mb-4">
                         {post.media_type === 'image' ? (
-                          <img src={post.media_url} alt={post.title} className="w-full h-full object-cover" />
+                          <img
+                            src={(() => {
+                              try {
+                                if (post.media_url.startsWith('[')) {
+                                  return JSON.parse(post.media_url)[0];
+                                }
+                                return post.media_url;
+                              } catch {
+                                return post.media_url;
+                              }
+                            })()}
+                            alt={post.title}
+                            className="w-full h-full object-cover"
+                          />
                         ) : post.media_type === 'video' ? (
                           <video src={post.media_url} className="w-full h-full object-cover" />
                         ) : (
@@ -2284,14 +2411,14 @@ const Admin: React.FC = () => {
 
               <div className="space-y-3">
                 {Object.entries({
-                  'page-home': '🏠 Accueil',
-                  'page-features': '✨ Fonctionnalités',
-                  'page-rules': '📋 Règles',
-                  'page-community': '👥 Communauté',
-                  'page-game': '🎮 Jeu',
-                  'page-shop': '🛍️ Shop',
-                  'page-gallery': '🎨 Galerie',
+                  'Home': '🏠 Accueil',
+                  'Features': '✨ Fonctionnalités',
+                  'Rules': '📋 Règles',
+                  'Community': '👥 Communauté',
+                  'Shop': '🛍️ Shop',
+                  'Gallery': '🎨 Galerie',
                   'About': 'ℹ️ À propos',
+                  'Chat': '💬 Chat',
                 }).map(([pageId, label]) => (
                   <div
                     key={pageId}
@@ -2301,17 +2428,20 @@ const Admin: React.FC = () => {
 
                     {/* Toggle Switch */}
                     <motion.button
-                      onClick={() => updatePageVisibility(pageId, !pageVisibilities[pageId])}
+                      onClick={() => {
+                        const currentVal = pageVisibilities[pageId] !== false;
+                        updatePageVisibility(pageId, !currentVal);
+                      }}
                       disabled={pageVisibilityLoading}
                       className="relative w-14 h-8 rounded-full transition-colors"
                       style={{
-                        backgroundColor: pageVisibilities[pageId] ? '#10b981' : '#6b7280'
+                        backgroundColor: (pageVisibilities[pageId] !== false) ? '#10b981' : '#6b7280'
                       }}
                     >
                       <motion.div
                         className="absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-lg"
                         animate={{
-                          x: pageVisibilities[pageId] ? 24 : 0
+                          x: (pageVisibilities[pageId] !== false) ? 24 : 0
                         }}
                         transition={{
                           type: 'spring',
@@ -2789,11 +2919,11 @@ const Admin: React.FC = () => {
 
                     {/* Rules for this category */}
                     <div className="bg-black/30 rounded-xl p-4 mb-4 max-h-40 overflow-y-auto">
-                      {rules.filter(r => r.category_id === category.id).length === 0 ? (
+                      {rules.filter(r => String(r.category_id) === String(category.id)).length === 0 ? (
                         <p className="text-gray-500 text-sm">Aucune règle dans cette catégorie</p>
                       ) : (
                         <ul className="space-y-2">
-                          {rules.filter(r => r.category_id === category.id).map(rule => (
+                          {rules.filter(r => String(r.category_id) === String(category.id)).map(rule => (
                             <li key={rule.id} className="flex items-start justify-between gap-4">
                               <div className="flex-1">
                                 <p className="font-bold text-white text-sm">{rule.title}</p>
@@ -2837,9 +2967,9 @@ const Admin: React.FC = () => {
                       </div>
                     )}
 
-                    {selectedCategoryId !== category.id && (
+                    {selectedCategoryId !== String(category.id) && (
                       <button
-                        onClick={() => setSelectedCategoryId(category.id)}
+                        onClick={() => setSelectedCategoryId(String(category.id))}
                         className="w-full py-2 bg-white/5 text-gray-400 hover:text-white rounded-lg transition-all text-sm"
                       >
                         Ajouter une règle à cette catégorie
@@ -3012,38 +3142,6 @@ const Admin: React.FC = () => {
 
                 {/* Filtre par status */}
                 <div className="mb-6 flex gap-2 flex-wrap items-center">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-luxury-gold/10 rounded-lg">
-                        <Users className="text-luxury-gold" size={24} />
-                      </div>
-                      <div>
-                        <h2 className="text-xl font-bold text-white tracking-tight">Gestion des Utilisateurs</h2>
-                        <p className="text-sm text-gray-400">{filteredUsers.length} utilisateurs trouvés</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleGlobalSync}
-                        className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-xl border border-indigo-500/20 text-xs font-black uppercase transition-all"
-                        title="Synchroniser avatars & IDs Discord pour tous les users"
-                      >
-                        <RefreshCcw size={14} className={loading ? 'animate-spin' : ''} />
-                        Sync Global
-                      </button>
-                      <button
-                        onClick={() => setIsOnlineOnly(!isOnlineOnly)}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-black uppercase transition-all ${isOnlineOnly
-                          ? 'bg-green-500/20 border-green-500/40 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.1)]'
-                          : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
-                          }`}
-                      >
-                        <Activity size={14} />
-                        En ligne
-                      </button>
-                    </div>
-                  </div>
                   {['OUVERT', 'EN_COURS', 'RÉSOLU', 'FERMÉ'].map((status) => (
                     <button
                       key={status}
