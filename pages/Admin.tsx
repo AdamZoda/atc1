@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../supabaseClient';
 import { Profile, Post, RuleCategory, Rule } from '../types';
-import { Users, FilePlus, ShieldCheck, Trash2, Upload, Send, LayoutDashboard, Settings, Video, Image as ImageIcon, BookOpen, History, Activity, Ticket, Music, Play, Pause, Copy, Check, Clock, Calendar, X, RefreshCcw } from 'lucide-react';
+import { Users, FilePlus, ShieldCheck, Trash2, Upload, Send, LayoutDashboard, Settings, Video, Image as ImageIcon, BookOpen, History, Activity, Ticket, Music, Play, Pause, Copy, Check, Clock, Calendar, X, RefreshCcw, MessageSquare } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import LocationDisplay from '../components/LocationDisplay';
 
@@ -377,13 +377,21 @@ const UserSidePanel: React.FC<{
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'posts' | 'config' | 'rules' | 'logs' | 'tickets' | 'music'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'posts' | 'config' | 'rules' | 'logs' | 'tickets' | 'music' | 'chat'>('users');
   const [users, setUsers] = useState<Profile[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [categories, setCategories] = useState<RuleCategory[]>([]);
   const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
   const { t } = useLanguage();
+
+  // Chat state
+  const [isChatLocked, setIsChatLocked] = useState(false);
+  const [chatSubmitting, setChatSubmitting] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupDesc, setNewGroupDesc] = useState('');
+  const [isGroupPublic, setIsGroupPublic] = useState(false);
+  const [groupParticipants, setGroupParticipants] = useState('');
 
   // Post form state
   const [title, setTitle] = useState('');
@@ -508,6 +516,7 @@ const Admin: React.FC = () => {
       fetchTickets();
       fetchMusicSettings();
       fetchMusicHistory();
+      fetchChatSettings();
 
       // Realtime subscription for users
       const channel = supabase
@@ -541,6 +550,104 @@ const Admin: React.FC = () => {
       if (data) setMusicHistory(data);
     } catch (error: any) {
       console.error('Erreur chargement historique musique:', error);
+    }
+  };
+
+  const fetchChatSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chat_rooms')
+        .select('is_locked')
+        .eq('id', '00000000-0000-0000-0000-000000000001')
+        .single();
+
+      if (data) setIsChatLocked(data.is_locked);
+    } catch (error) {
+      console.error('Error fetching chat settings:', error);
+    }
+  };
+
+  const toggleChatLock = async () => {
+    setChatSubmitting(true);
+    try {
+      const newState = !isChatLocked;
+      const { error } = await supabase
+        .from('chat_rooms')
+        .update({ is_locked: newState })
+        .eq('id', '00000000-0000-0000-0000-000000000001');
+
+      if (!error) {
+        setIsChatLocked(newState);
+        await logAdminAction(
+          'chat_lock_toggle',
+          `💬 Chat général ${newState ? 'verrouillé' : 'déverrouillé'}`,
+          'chat',
+          'Général'
+        );
+      }
+    } catch (error) {
+      console.error('Error toggling chat lock:', error);
+    } finally {
+      setChatSubmitting(false);
+    }
+  };
+
+  const createGroup = async () => {
+    if (!newGroupName.trim()) return alert('Nom du groupe requis');
+
+    setChatSubmitting(true);
+    try {
+      // 1. Create Room
+      const { data: room, error: roomError } = await supabase
+        .from('chat_rooms')
+        .insert({
+          name: newGroupName,
+          description: newGroupDesc,
+          type: 'group',
+          is_public: isGroupPublic,
+          created_by: profile.id
+        })
+        .select()
+        .single();
+
+      if (roomError) throw roomError;
+
+      // 2. Add participants if provided
+      if (groupParticipants.trim()) {
+        const participantIds = groupParticipants.split(',').map(id => id.trim()).filter(id => id);
+
+        // Include creator
+        participantIds.push(profile.id);
+
+        const participantEntries = participantIds.map(userId => ({
+          room_id: room.id,
+          user_id: userId
+        }));
+
+        const { error: partError } = await supabase
+          .from('chat_participants')
+          .insert(participantEntries);
+
+        if (partError) console.error('Error adding participants:', partError);
+      } else {
+        // Just add the creator
+        await supabase.from('chat_participants').insert({
+          room_id: room.id,
+          user_id: profile.id
+        });
+      }
+
+      await logAdminAction('create_group', `📁 Création du groupe "${newGroupName}" (${isGroupPublic ? 'Public' : 'Privé'})`, 'chat', newGroupName);
+
+      alert('Groupe créé avec succès');
+      setNewGroupName('');
+      setNewGroupDesc('');
+      setIsGroupPublic(false);
+      setGroupParticipants('');
+    } catch (error: any) {
+      alert(`Erreur: ${error.message}`);
+    } finally {
+      setChatSubmitting(false);
     }
   };
 
@@ -1920,6 +2027,15 @@ const Admin: React.FC = () => {
               className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'music' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
             >
               <Music size={16} /> Musique
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('chat');
+                fetchChatSettings();
+              }}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'chat' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
+            >
+              <MessageSquare size={16} /> Chat
             </button>
           </div>
         </header>
@@ -3373,6 +3489,130 @@ const Admin: React.FC = () => {
                   ))}
                 </div>
               )}
+            </div>
+          </motion.div>
+        )}
+        {activeTab === 'chat' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-6"
+          >
+            <h2 className="text-3xl font-bold text-luxury-gold">💬 Gestion du Chat</h2>
+
+            <div className="glass p-10 rounded-[3rem] border border-white/10">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+                <div className="flex-1">
+                  <h3 className="text-2xl font-bold text-white mb-3">Chat Général</h3>
+                  <p className="text-gray-400 leading-relaxed">
+                    Contrôlez l'accès au canal de discussion général. Si verrouillé, seuls les administrateurs pourront envoyer des messages.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-6 p-6 glass rounded-2xl border border-white/5">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className={`w-3 h-3 rounded-full ${isChatLocked ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Status</span>
+                  </div>
+
+                  <button
+                    onClick={toggleChatLock}
+                    disabled={chatSubmitting}
+                    className={`
+                      px-8 py-4 rounded-xl font-black uppercase tracking-[0.2em] transition-all duration-500
+                      ${isChatLocked
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30'
+                        : 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30'}
+                    `}
+                  >
+                    {chatSubmitting ? '...' : (isChatLocked ? 'Déverrouiller' : 'Verrouiller')}
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-12 p-6 bg-white/5 rounded-2xl border border-white/5">
+                <h4 className="text-sm font-bold text-luxury-gold uppercase tracking-widest mb-4">Fonctionnalités à venir</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 glass rounded-xl opacity-50 grayscale">
+                    <p className="text-xs font-bold text-white mb-1">Effacement Auto</p>
+                    <p className="text-[10px] text-gray-400">Nettoyage automatique des messages (24h)</p>
+                  </div>
+                  <div className="p-4 glass rounded-xl opacity-50 grayscale">
+                    <p className="text-xs font-bold text-white mb-1">Mots Interdits</p>
+                    <p className="text-[10px] text-gray-400">Filtrage des insultes et liens</p>
+                  </div>
+                  <div className="p-4 glass rounded-xl opacity-50 grayscale">
+                    <p className="text-xs font-bold text-white mb-1">Slow Mode</p>
+                    <p className="text-[10px] text-gray-400">Délai entre chaque message</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="glass p-10 rounded-[3rem] border border-white/10 mt-8">
+              <h3 className="text-2xl font-bold text-luxury-gold mb-8 uppercase tracking-widest">📁 Créer un Groupe</h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Nom du Groupe</label>
+                    <input
+                      type="text"
+                      value={newGroupName}
+                      onChange={(e) => setNewGroupName(e.target.value)}
+                      placeholder="Ex: Staff Atlantic"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-white focus:border-luxury-gold/50 transition-all outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Description</label>
+                    <textarea
+                      value={newGroupDesc}
+                      onChange={(e) => setNewGroupDesc(e.target.value)}
+                      placeholder="Objectif du groupe..."
+                      className="w-full h-32 bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-white focus:border-luxury-gold/50 transition-all outline-none resize-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Participants (IDs séparés par des virgules)</label>
+                    <textarea
+                      value={groupParticipants}
+                      onChange={(e) => setGroupParticipants(e.target.value)}
+                      placeholder="00000000-0000-0000-0000-000000000000, ..."
+                      className="w-full h-32 bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-white font-mono text-xs focus:border-luxury-gold/50 transition-all outline-none resize-none"
+                    />
+                    <p className="text-[10px] text-gray-500 mt-2">
+                      Astuce: Vous pouvez trouver l'ID d'un utilisateur dans l'onglet "Utilisateurs".
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between p-5 glass rounded-2xl border border-white/5">
+                    <div>
+                      <p className="text-sm font-bold text-white mb-1">Visibilité Publique</p>
+                      <p className="text-[10px] text-gray-400">Si activé, tout le monde pourra voir et rejoindre ce groupe.</p>
+                    </div>
+                    <button
+                      onClick={() => setIsGroupPublic(!isGroupPublic)}
+                      className={`w-14 h-7 rounded-full relative transition-all duration-300 ${isGroupPublic ? 'bg-luxury-gold' : 'bg-white/10'}`}
+                    >
+                      <div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all duration-300 ${isGroupPublic ? 'left-8' : 'left-1'}`} />
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={createGroup}
+                    disabled={chatSubmitting || !newGroupName.trim()}
+                    className="w-full py-5 bg-luxury-gold hover:bg-luxury-goldLight disabled:opacity-50 text-black font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-lg shadow-luxury-gold/20"
+                  >
+                    {chatSubmitting ? 'Création...' : 'Créer le Groupe'}
+                  </button>
+                </div>
+              </div>
             </div>
           </motion.div>
         )}

@@ -31,6 +31,7 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
       { label: t('nav.rules'), path: '/rules', visible: isPageVisible('Rules') },
       { label: 'À propos', path: '/about', visible: isPageVisible('About') },
       { label: t('nav.community'), path: '/community', visible: isPageVisible('Community') },
+      { label: 'Chat', path: '/chat', visible: true },
       ...(isPageVisible('Game') || profile?.role === 'admin' ? [{ label: 'Jeu', path: '/game', visible: true }] : []),
       { label: 'Shop', path: '/shop', visible: isPageVisible('Shop') },
       { label: t('nav.media'), path: '/media', restricted: true, visible: isPageVisible('Gallery') },

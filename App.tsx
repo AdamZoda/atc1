@@ -23,6 +23,7 @@ import Login from './pages/Login';
 import AuthCallback from './pages/AuthCallback';
 import ProfilePage from './pages/Profile';
 import GamePage from './pages/Game';
+import Chat from './pages/Chat';
 
 // Components
 import Navbar from './components/Navbar';
@@ -260,6 +261,7 @@ const AppContent = () => {
               />
 
               <Route path="/profile" element={session ? <ProfilePage /> : <Navigate to="/login" />} />
+              <Route path="/chat" element={session ? <Chat /> : <Navigate to="/login" />} />
 
               {/* Auth Routes */}
               <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />

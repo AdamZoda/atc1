@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { MapPin, Navigation, Upload, X } from 'lucide-react';
+import { MapPin, Navigation, Upload, X, Copy, Check } from 'lucide-react';
 
 const ProfilePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -16,11 +16,13 @@ const ProfilePage: React.FC = () => {
   const [avatarPreview, setAvatarPreview] = useState('');
   const [showLocationHelp, setShowLocationHelp] = useState(false);
   const [canEditProfile, setCanEditProfile] = useState(true);
+  const [userId, setUserId] = useState('');
+  const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
   const DEFAULT_AVATAR = 'https://i.postimg.cc/rF1jc0R2/depositphotos-51405259-stock-illustration-male-avatar-profile-picture-use.jpg';
-  const AVATARS_BUCKET = import.meta.env.VITE_AVATARS_BUCKET || 'avatars';
+  const AVATARS_BUCKET = (import.meta as any).env.VITE_AVATARS_BUCKET || 'avatars';
 
   useEffect(() => {
     (async () => {
@@ -35,6 +37,7 @@ const ProfilePage: React.FC = () => {
 
         const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
         if (profileData) {
+          setUserId(profileData.id);
           setUsername(profileData.username || '');
           setDisplayName(profileData.display_name || '');
           setAvatarUrl(profileData.avatar_url || '');
@@ -282,6 +285,29 @@ const ProfilePage: React.FC = () => {
               disabled={!canEditProfile}
             />
             <p className="text-xs text-gray-400">Ce nom sera visible pour les autres joueurs</p>
+          </div>
+
+          {/* User ID Section */}
+          <div className="mb-8 pb-8 border-b border-white/10">
+            <label className="block text-sm font-semibold text-gray-300 mb-3 uppercase tracking-widest">Mon Identifiant (ID)</label>
+            <div className="flex gap-2">
+              <input
+                className="flex-1 p-3 rounded-lg bg-black/40 border border-white/10 text-gray-400 font-mono text-sm outline-none"
+                value={userId}
+                readOnly
+              />
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(userId);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className={`px-4 rounded-lg flex items-center justify-center transition-all ${copied ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10'}`}
+              >
+                {copied ? <Check size={18} /> : <Copy size={18} />}
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-500 mt-2 italic">Partagez cet ID pour que l'on puisse vous contacter en privé ou vous ajouter à un groupe.</p>
           </div>
 
           {/* Géolocalisation section */}

@@ -198,7 +198,7 @@ const Home: React.FC = () => {
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
-              { label: "Joueurs Actifs", value: `${serverStats.players}`, icon: Users, sub: "Communauté engagée" },
+              { label: "Joueurs Actifs RÉEL-TIMES ", value: `${serverStats.players}`, icon: Users, sub: "Communauté engagée" },
               { label: "Scripts Uniques", value: `${serverStats.resources}`, icon: Server, sub: "Optimisation maximale" },
               { label: "Staff Réactif", value: "24/7", icon: Shield, sub: "Sécurité garantie" },
             ].map((stat, i) => (
