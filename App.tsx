@@ -19,7 +19,7 @@ import Shop from './pages/Shop';
 import About from './pages/About';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
-import Signup from './pages/Signup';
+
 import AuthCallback from './pages/AuthCallback';
 import ProfilePage from './pages/Profile';
 import GamePage from './pages/Game';
@@ -51,28 +51,55 @@ const AppContent = () => {
   const location = useLocation();
 
   useEffect(() => {
+    // Système de Presence (Heartbeat)
+    let heartbeatInterval: any;
+
+    const updatePresence = async () => {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (currentSession?.user?.id) {
+        // SOLUTION FINALE : On met juste à jour l'heure. Si l'heure est récente, le joueur est ONLINE.
+        await supabase
+          .from('profiles')
+          .update({
+            last_seen: new Date().toISOString(),
+            is_online: true
+          })
+          .eq('id', currentSession.user.id);
+      }
+    };
+
+    const startHeartbeat = () => {
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+      updatePresence();
+      heartbeatInterval = setInterval(updatePresence, 30000);
+    };
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) {
-        // Réinitialise le flag de refus de localisation à chaque nouvelle session
         localStorage.removeItem(`geo-notification-refused-${session.user.id}`);
         fetchProfile(session.user.id);
+        startHeartbeat();
       } else setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       if (session) {
-        // Réinitialises le flag de refus de localisation à chaque nouvelle session
         localStorage.removeItem(`geo-notification-refused-${session.user.id}`);
         fetchProfile(session.user.id);
+        if (event === 'SIGNED_IN') startHeartbeat();
       } else {
         setProfile(null);
         setLoading(false);
+        if (heartbeatInterval) clearInterval(heartbeatInterval);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+    };
   }, []);
 
   // Charger le background global une fois au démarrage
@@ -106,6 +133,7 @@ const AppContent = () => {
   // }, [profile]);
 
   const fetchProfile = async (userId: string) => {
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -113,24 +141,32 @@ const AppContent = () => {
       .single();
 
     if (data) {
+      // --- SYNCHRONISATION AUTOMATIQUE INFOS DISCORD (Avatar + ID) ---
+      // On récupère les dernières infos fournies par Discord (via les métadonnées de session)
+      const metadata = currentSession?.user?.user_metadata;
+      const discordAvatar = metadata?.avatar_url;
+      const discordId = metadata?.sub || metadata?.provider_id;
+
+      const updates: any = {};
+      if (discordAvatar && discordAvatar !== data.avatar_url) updates.avatar_url = discordAvatar;
+      if (discordId && discordId !== data.provider_id) updates.provider_id = discordId;
+
+      if (Object.keys(updates).length > 0) {
+        console.log('🔄 Sync Discord en temps réel:', updates);
+        await supabase
+          .from('profiles')
+          .update(updates)
+          .eq('id', userId);
+
+        // Mise à jour de l'objet local pour affichage immédiat
+        if (updates.avatar_url) data.avatar_url = updates.avatar_url;
+        if (updates.provider_id) data.provider_id = updates.provider_id;
+      }
+
       setProfile(data);
       // Si l'utilisateur est banni, afficher l'écran et attendre son clic
       if (data.banned) {
         console.warn('⛔ UTILISATEUR BANNI - ÉCRAN DE BANNISSEMENT');
-      } else {
-        // Check if user needs to authorize location - show permission prompt
-        // BUT: don't show if user already refused (localStorage flag)
-        const hasRefused = localStorage.getItem(`geo-notification-refused-${userId}`) === 'true';
-        
-        // Force show if ?forceLocation=true in URL (for testing)
-        const urlParams = new URLSearchParams(window.location.search);
-        const forceLocation = urlParams.get('forceLocation') === 'true';
-        
-        if (!hasRefused && (!data.latitude || !data.longitude || forceLocation)) {
-          setShowLocationPermission(true);
-          setLoading(false);
-          return;
-        }
       }
     }
     setLoading(false);
@@ -144,6 +180,7 @@ const AppContent = () => {
     );
   }
 
+  /*
   // Show location permission screen if user is logged in but hasn't authorized location
   if (showLocationPermission && session) {
     return (
@@ -156,6 +193,7 @@ const AppContent = () => {
       />
     );
   }
+  */
 
   // ⛔ Si l'utilisateur est banni, afficher l'écran de bannissement
   if (profile && profile.banned) {
@@ -186,9 +224,9 @@ const AppContent = () => {
               <source src={background.value} type="video/mp4" />
             </video>
           ) : (
-            <img 
-              src={background.value} 
-              className="w-full h-full object-cover opacity-40" 
+            <img
+              src={background.value}
+              className="w-full h-full object-cover opacity-40"
               alt="Background"
             />
           )
@@ -210,22 +248,22 @@ const AppContent = () => {
               <Route path="/community" element={<Community />} />
               <Route path="/game" element={<GamePage profile={profile} />} />
               <Route path="/shop" element={<Shop />} />
-              
+
               {/* Protected Routes */}
-              <Route 
-                path="/media" 
-                element={session ? <Media /> : <Navigate to="/signup" />} 
+              <Route
+                path="/media"
+                element={session ? <Media /> : <Navigate to="/login" />}
               />
-              <Route 
-                path="/admin" 
-                element={(profile && profile.role === 'admin') ? <Admin /> : <Navigate to="/" />} 
+              <Route
+                path="/admin"
+                element={(profile && profile.role === 'admin') ? <Admin /> : <Navigate to="/" />}
               />
 
               <Route path="/profile" element={session ? <ProfilePage /> : <Navigate to="/login" />} />
-              
+
               {/* Auth Routes */}
               <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
-              <Route path="/signup" element={!session ? <Signup /> : <Navigate to="/" />} />
+              <Route path="/signup" element={<Navigate to="/login" replace />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
             </Routes>
           </AnimatePresence>

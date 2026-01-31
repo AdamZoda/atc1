@@ -17,7 +17,7 @@ export const translations = {
     },
     // Home page
     home: {
-      title: 'LIVE THE ABUNDANCE',
+      title: 'LIVE THE ROLLPLAY',
       subtitle: 'The Excellence of Roleplay',
       description: 'Discover Atlantic RP, the FiveM server where luxury meets total immersion. Exclusive systems, realistic economy and prestigious community.',
       joinNow: 'Join Now',
@@ -157,7 +157,8 @@ export const translations = {
       chat: 'Community Chat',
       acceptAll: 'Accept All',
       winners: 'Winners',
-    },  },
+    },
+  },
   fr: {
     // Navigation
     nav: {
@@ -269,7 +270,7 @@ export const translations = {
     footer: {
       rights: 'Tous droits réservés. Design by FiveM Experts.',
       contact: 'Contact',
-      discord: 'Rejoindre Notre Discord Officiel',
+      discord: 'Rejoindre Notre DISCORD',
       support: 'Support',
     },
     // Common

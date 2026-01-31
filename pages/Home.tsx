@@ -6,18 +6,24 @@ import { Play, Users, Shield, Server, ArrowRight, X } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 import { SiteSetting } from '../types';
 import { useLanguage } from '../LanguageContext';
+import Scene3D from '../components/Scene3D';
 
 const Home: React.FC = () => {
   const [background, setBackground] = useState<{ value: string; type: 'image' | 'video' } | null>(null);
   const [copied, setCopied] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [serverStats, setServerStats] = useState({
+    players: siteConfig.server.playersOnline,
+    maxPlayers: siteConfig.server.maxPlayers,
+    resources: 290
+  });
   const { t } = useLanguage();
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(`connect ${siteConfig.server.ip}`);
     setCopied(true);
     setShowTutorial(true);
-    
+
     // Ouvrir FiveM en même temps
     window.location.href = siteConfig.server.connectUrl;
   };
@@ -41,6 +47,35 @@ const Home: React.FC = () => {
     fetchBackground();
   }, []);
 
+  useEffect(() => {
+    const fetchServerData = async () => {
+      try {
+        // Ajout d'un timestamp pour forcer le rafraîchissement (anti-cache)
+        const timestamp = new Date().getTime();
+        const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(`https://servers-frontend.fivem.net/api/servers/single/vzbjxk?t=${timestamp}`)}`);
+        if (!response.ok) return;
+
+        const json = await response.json();
+        const result = JSON.parse(json.contents);
+        const data = result.Data;
+
+        if (data) {
+          setServerStats({
+            players: data.clients || 0,
+            maxPlayers: data.sv_maxclients || 300,
+            resources: data.resources ? data.resources.length : 290
+          });
+        }
+      } catch (error) {
+        console.error('FiveM API Error:', error);
+      }
+    };
+
+    fetchServerData();
+    const interval = setInterval(fetchServerData, 10000); // Réduit à 10 secondes
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -48,10 +83,11 @@ const Home: React.FC = () => {
       exit={{ opacity: 0 }}
       className="relative min-h-screen pt-28 md:pt-32 lg:pt-10"
     >
+
       {/* Hero Section */}
-      <section className="relative h-screen flex items-center justify-center overflow-hidden">
+      <section className="relative min-h-screen flex items-center overflow-hidden">
         {/* Dynamic Background */}
-        <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 z-0 pointer-events-none">
           {background && (
             background.type === 'video' ? (
               <video
@@ -65,9 +101,9 @@ const Home: React.FC = () => {
                 <source src={background.value} type="video/mp4" />
               </video>
             ) : (
-              <img 
-                src={background.value} 
-                className="w-full h-full object-cover opacity-40" 
+              <img
+                src={background.value}
+                className="w-full h-full object-cover opacity-40"
                 alt="Background"
               />
             )
@@ -76,66 +112,81 @@ const Home: React.FC = () => {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_0%,_#050505_90%)]"></div>
         </div>
 
-        {/* Content */}
-        <div className="relative z-10 text-center px-4 max-w-4xl">
+        {/* Content & 3D Model Grid */}
+        <div className="relative z-10 w-full max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center h-full pt-20 lg:pt-0">
+
+          {/* Left Column: Text Content */}
+          <div className="text-center lg:text-left order-2 lg:order-1">
+            <motion.div
+              initial={{ y: 30, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="flex justify-center lg:justify-start mb-8"
+            >
+              <span className="px-4 py-1.5 rounded-full border border-luxury-gold/30 bg-luxury-gold/10 text-luxury-gold text-xs font-bold uppercase tracking-[0.3em] backdrop-blur-sm">
+                {t('home.subtitle')}
+              </span>
+            </motion.div>
+
+            <motion.h1
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className="font-cinzel text-5xl md:text-7xl lg:text-8xl font-black mb-6 tracking-tight leading-tight"
+            >
+              {t('home.title')}
+            </motion.h1>
+
+            <motion.p
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.6 }}
+              className="text-gray-300 text-lg md:text-xl mb-12 max-w-2xl mx-auto lg:mx-0 leading-relaxed font-light"
+            >
+              {t('home.description')}
+            </motion.p>
+
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.8 }}
+              className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-6"
+            >
+              <button
+                onClick={copyToClipboard}
+                className="w-full sm:w-auto px-10 py-5 rounded-xl bg-luxury-gold text-black font-black flex items-center justify-center gap-3 transition-all hover:scale-105 button-glow text-lg uppercase tracking-wider"
+              >
+                <Play fill="black" size={20} />
+                {copied ? '✓ Copié!' : 'Rejoindre le Serveur'}
+              </button>
+              <a
+                href={siteConfig.links.discord}
+                target="_blank"
+                className="w-full sm:w-auto px-10 py-5 rounded-xl glass text-white font-bold flex items-center justify-center gap-3 transition-all hover:bg-white/10 text-lg uppercase tracking-wider"
+              >
+                DISCORD
+                <ArrowRight size={20} />
+              </a>
+            </motion.div>
+          </div>
+
+          {/* Right Column: 3D Model */}
           <motion.div
-            initial={{ y: 30, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="flex justify-center mb-8"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 1, delay: 0.5 }}
+            className="h-[500px] lg:h-[800px] w-full order-1 lg:order-2 flex items-center justify-center"
           >
-            <span className="px-4 py-1.5 rounded-full border border-luxury-gold/30 bg-luxury-gold/10 text-luxury-gold text-xs font-bold uppercase tracking-[0.3em] backdrop-blur-sm">
-              {t('home.subtitle')}
-            </span>
+            <Scene3D />
           </motion.div>
 
-          <motion.h1
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="font-cinzel text-5xl md:text-8xl font-black mb-6 tracking-tight leading-tight"
-          >
-            {t('home.title')}
-          </motion.h1>
-
-          <motion.p
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.6 }}
-            className="text-gray-300 text-lg md:text-xl mb-12 max-w-2xl mx-auto leading-relaxed font-light"
-          >
-            {t('home.description')}
-          </motion.p>
-
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.8 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-6"
-          >
-            <button 
-              onClick={copyToClipboard}
-              className="w-full sm:w-auto px-10 py-5 rounded-xl bg-luxury-gold text-black font-black flex items-center justify-center gap-3 transition-all hover:scale-105 button-glow text-lg uppercase tracking-wider"
-            >
-              <Play fill="black" size={20} />
-              {copied ? '✓ Copié!' : 'Rejoindre le Serveur'}
-            </button>
-            <a 
-              href={siteConfig.links.discord}
-              target="_blank"
-              className="w-full sm:w-auto px-10 py-5 rounded-xl glass text-white font-bold flex items-center justify-center gap-3 transition-all hover:bg-white/10 text-lg uppercase tracking-wider"
-            >
-              Discord Officiel
-              <ArrowRight size={20} />
-            </a>
-          </motion.div>
         </div>
 
         {/* Scroll Indicator */}
-        <motion.div 
+        <motion.div
           animate={{ y: [0, 10, 0] }}
           transition={{ repeat: Infinity, duration: 2 }}
-          className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 opacity-50"
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 opacity-50 z-20 pointer-events-none"
         >
           <span className="text-[10px] uppercase font-bold tracking-[0.4em]"> atc</span>
           <div className="w-[1px] h-12 bg-gradient-to-b from-luxury-gold to-transparent"></div>
@@ -147,8 +198,8 @@ const Home: React.FC = () => {
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
-              { label: "Joueurs Actifs", value: siteConfig.server.playersOnline, icon: Users, sub: "Communauté engagée" },
-              { label: "Scripts Uniques", value: "150+", icon: Server, sub: "Optimisation maximale" },
+              { label: "Joueurs Actifs", value: `${serverStats.players}`, icon: Users, sub: "Communauté engagée" },
+              { label: "Scripts Uniques", value: `${serverStats.resources}`, icon: Server, sub: "Optimisation maximale" },
               { label: "Staff Réactif", value: "24/7", icon: Shield, sub: "Sécurité garantie" },
             ].map((stat, i) => (
               <motion.div

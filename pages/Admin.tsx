@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../supabaseClient';
 import { Profile, Post, RuleCategory, Rule } from '../types';
-import { Users, FilePlus, ShieldCheck, Trash2, Upload, Send, LayoutDashboard, Settings, Video, Image as ImageIcon, BookOpen, History, Activity, Ticket, Music, Play, Pause, Copy, Check } from 'lucide-react';
+import { Users, FilePlus, ShieldCheck, Trash2, Upload, Send, LayoutDashboard, Settings, Video, Image as ImageIcon, BookOpen, History, Activity, Ticket, Music, Play, Pause, Copy, Check, Clock, Calendar, X, RefreshCcw } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import LocationDisplay from '../components/LocationDisplay';
 
@@ -12,26 +12,366 @@ const showToast = (message: string) => {
   console.log('ℹ️', message);
 };
 
-// Composant pour copier le Discord ID au format <@id>
-const CopyProviderIdButton: React.FC<{ providerId: string }> = ({ providerId }) => {
-  const handleCopy = async () => {
+// --- NOUVEAUX COMPOSANTS POUR L'INTERFACE TXADMIN ---
+
+// Carte Utilisateur individuel (txAdmin style)
+const UserCard: React.FC<{
+  user: Profile;
+  onClick: (user: Profile) => void;
+}> = ({ user, onClick }) => {
+  // SOLUTION FINALE : Si l'utilisateur a donné signe de vie il y a moins de 120 secondes, il est ONLINE.
+  const isActuallyOnline = user.last_seen && (Date.now() - new Date(user.last_seen).getTime() < 120000);
+  const hasGPS = user.latitude && user.longitude;
+
+  return (
+    <motion.div
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={() => onClick(user)}
+      className={`relative p-4 rounded-2xl border transition-all cursor-pointer overflow-hidden ${isActuallyOnline
+        ? 'bg-green-500/10 border-green-500/50 shadow-[0_0_15px_rgba(34,197,94,0.2)]'
+        : 'bg-white/5 border-white/10 opacity-70 grayscale-[0.8]'
+        } ${user.banned ? 'border-red-500/50 bg-red-500/5' : ''}`}
+    >
+      {/* Status indicator (Glow pulse for online) */}
+      <div className="absolute top-3 right-3 flex items-center gap-2">
+        {isActuallyOnline && (
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+          </span>
+        )}
+        {!isActuallyOnline && <div className="h-3 w-3 rounded-full bg-gray-600 shadow-inner"></div>}
+      </div>
+
+      <div className="flex items-center gap-4">
+        {/* Avatar */}
+        <div className="relative">
+          {user.avatar_url ? (
+            <img
+              src={user.avatar_url}
+              alt={user.username}
+              className={`w-14 h-14 rounded-xl object-cover border-2 transition-colors ${isActuallyOnline ? 'border-green-500' : 'border-white/10'}`}
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.onerror = null;
+                target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.display_name || user.username)}&background=random&color=fff`;
+              }}
+            />
+          ) : (
+            <div className={`w-14 h-14 rounded-xl bg-luxury-gold/20 flex items-center justify-center text-luxury-gold font-bold text-xl border ${isActuallyOnline ? 'border-green-500/50' : 'border-transparent'}`}>
+              {user.username.charAt(0).toUpperCase()}
+            </div>
+          )}
+        </div>
+
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <h3 className={`font-bold truncate transition-colors ${isActuallyOnline ? 'text-green-400' : 'text-white'}`}>
+            {user.display_name || user.username}
+          </h3>
+          <p className="text-[10px] text-gray-400 font-mono truncate opacity-60">ID: {user.id.slice(0, 8)}...</p>
+
+          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+            <span className={`text-[8px] px-1.5 py-0.5 rounded-md font-black uppercase tracking-widest ${user.role === 'admin' ? 'bg-luxury-gold text-black' : 'bg-white/10 text-gray-400'
+              }`}>
+              {user.role}
+            </span>
+            {user.banned && (
+              <span className="text-[8px] px-1.5 py-0.5 rounded-md font-black bg-red-500 text-white uppercase">BAN</span>
+            )}
+            {user.warnings && (
+              <span className="text-[8px] px-1.5 py-0.5 rounded-md font-black bg-yellow-500 text-black uppercase">{user.warnings} WARNS</span>
+            )}
+            {hasGPS && (
+              <span className="text-[8px] px-1.5 py-0.5 rounded-md font-black bg-cyan-500 text-white uppercase flex items-center gap-1"><Activity size={8} /> GPS</span>
+            )}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+// Panneau latéral détaillé (Side Panel)
+const UserSidePanel: React.FC<{
+  user: Profile | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onBan: (user: Profile) => void;
+  onUnban: (user: Profile) => void;
+  onWarn: (user: Profile) => void;
+  onDelete: (user: Profile) => void;
+  onPromote: (user: Profile) => void;
+  onRemoveAdmin: (user: Profile) => void;
+  onUpdateNotes: (userId: string, notes: string) => void;
+  onSync?: () => void;
+}> = ({ user, isOpen, onClose, onBan, onUnban, onWarn, onDelete, onPromote, onRemoveAdmin, onUpdateNotes, onSync }) => {
+  const [localNotes, setLocalNotes] = React.useState('');
+  const [activeSubTab, setActiveSubTab] = React.useState<'overview' | 'json'>('overview');
+  const [rawAuthData, setRawAuthData] = React.useState<any>(null);
+  const [loadingAuth, setLoadingAuth] = React.useState(false);
+
+  const fetchRawAuth = async (userId: string) => {
+    setLoadingAuth(true);
     try {
-      const formattedId = `<@${providerId}>`;
-      await navigator.clipboard.writeText(formattedId);
-      console.log(`✅ Discord ID copié: ${formattedId}`);
+      const { data, error } = await supabase.rpc('get_full_user_auth', { u_id: userId });
+      if (error) throw error;
+      setRawAuthData(data);
+
+      // --- LOGIQUE DE SYNCHRONISATION AUTOMATIQUE ---
+      const metadata = data?.raw_user_meta_data;
+      const discordAvatar = metadata?.avatar_url;
+      const discordId = metadata?.sub || metadata?.provider_id;
+
+      const updates: any = {};
+      if (discordAvatar && discordAvatar !== user?.avatar_url) updates.avatar_url = discordAvatar;
+      if (discordId && discordId !== user?.provider_id) updates.provider_id = discordId;
+
+      if (Object.keys(updates).length > 0) {
+        console.log(`🔄 Sync Auto (${user?.username}):`, updates);
+        await supabase
+          .from('profiles')
+          .update(updates)
+          .eq('id', userId);
+
+        if (onSync) onSync();
+      }
     } catch (err) {
-      console.error('❌ Erreur lors de la copie:', err);
+      console.error('Erreur RPC Raw JSON:', err);
+      setRawAuthData({ ...user, _note: "RPC 'get_full_user_auth' non trouvé ou accès restreint." });
+    } finally {
+      setLoadingAuth(false);
     }
   };
 
+  React.useEffect(() => {
+    if (user) {
+      setLocalNotes(user.admin_notes || '');
+      setActiveSubTab('overview');
+      setRawAuthData(null);
+    }
+  }, [user]);
+
+  React.useEffect(() => {
+    if (user && !rawAuthData) {
+      fetchRawAuth(user.id);
+    }
+  }, [user]);
+
+  if (!user) return null;
+
+  const isActuallyOnline = user.last_seen && (Date.now() - new Date(user.last_seen).getTime() < 120000);
+  const hasGPS = user.latitude && user.longitude;
+
   return (
-    <button
-      onClick={handleCopy}
-      className="p-2 rounded-lg hover:bg-indigo-500/30 transition-all duration-200 text-indigo-400 hover:text-indigo-300"
-      title={`Copier: <@${providerId}>`}
-    >
-      <Copy size={20} />
-    </button>
+    <>
+      {/* Backdrop overlay */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999]"
+          />
+        )}
+      </AnimatePresence>
+
+      <motion.div
+        initial={{ x: '100%' }}
+        animate={{ x: isOpen ? 0 : '100%' }}
+        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+        className="fixed top-0 right-0 w-full max-w-md h-full bg-[#0a0a0a] border-l border-white/10 z-[1000] shadow-2xl overflow-y-auto"
+      >
+        {/* Header Panel */}
+        <div className="p-6 border-b border-white/10 flex items-center justify-between sticky top-0 bg-[#0a0a0a] z-10">
+          <h2 className="text-xl font-black text-white uppercase tracking-widest">Détails Joueur</h2>
+          <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-all">
+            <X size={24} />
+          </button>
+        </div>
+
+        {/* Tab Switcher */}
+        <div className="flex px-8 mt-4 gap-4 border-b border-white/5">
+          <button
+            onClick={() => setActiveSubTab('overview')}
+            className={`pb-4 text-[10px] font-black uppercase tracking-widest transition-all relative ${activeSubTab === 'overview' ? 'text-luxury-gold' : 'text-gray-500 hover:text-gray-300'}`}
+          >
+            Aperçu
+            {activeSubTab === 'overview' && <motion.div layoutId="subtab-active" className="absolute bottom-0 left-0 right-0 h-0.5 bg-luxury-gold" />}
+          </button>
+          <button
+            onClick={() => setActiveSubTab('json')}
+            className={`pb-4 text-[10px] font-black uppercase tracking-widest transition-all relative ${activeSubTab === 'json' ? 'text-luxury-gold' : 'text-gray-500 hover:text-gray-300'}`}
+          >
+            Raw JSON
+            {activeSubTab === 'json' && <motion.div layoutId="subtab-active" className="absolute bottom-0 left-0 right-0 h-0.5 bg-luxury-gold" />}
+          </button>
+        </div>
+
+        <div className="p-8 space-y-8">
+          {activeSubTab === 'overview' ? (
+            <>
+              {/* User Identity Section */}
+              <div className="flex flex-col items-center">
+                <div className="relative mb-4">
+                  <img
+                    src={user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username)}&background=random&color=fff`}
+                    alt={user.username}
+                    className={`w-32 h-32 rounded-3xl object-cover border-4 shadow-xl transition-colors ${isActuallyOnline ? 'border-green-500 shadow-green-500/20' : 'border-gray-500'}`}
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className={`absolute -bottom-2 -right-2 px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest border-2 border-[#0a0a0a] ${isActuallyOnline ? 'bg-green-500 text-white shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-gray-600 text-white'}`}>
+                    {isActuallyOnline ? 'ONLINE' : 'OFFLINE'}
+                  </div>
+                </div>
+                <h1 className="text-2xl font-black text-white">{user.display_name || user.username}</h1>
+                <p className="text-gray-500 font-mono text-sm">UID: {user.id}</p>
+              </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white/5 p-4 rounded-2xl border border-white/5 flex flex-col gap-1">
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <Clock size={12} />
+                    <p className="text-[10px] uppercase font-black tracking-widest">Dernière activité</p>
+                  </div>
+                  <p className="text-sm text-gray-200">{user.last_seen ? new Date(user.last_seen).toLocaleString() : 'Jamais'}</p>
+                </div>
+                <div className="bg-white/5 p-4 rounded-2xl border border-white/5 flex flex-col gap-1">
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <Calendar size={12} />
+                    <p className="text-[10px] uppercase font-black tracking-widest">Inscription</p>
+                  </div>
+                  <p className="text-sm text-gray-200">{user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Inconnue'}</p>
+                </div>
+                <div className="bg-white/5 p-4 rounded-2xl border border-white/5 flex flex-col gap-1">
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <ShieldCheck size={12} />
+                    <p className="text-[10px] uppercase font-black tracking-widest">Rôle</p>
+                  </div>
+                  <p className="text-sm text-luxury-gold font-bold uppercase tracking-widest">{user.role}</p>
+                </div>
+                <div className="bg-white/5 p-4 rounded-2xl border border-white/5 flex flex-col gap-1">
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <Activity size={12} />
+                    <p className="text-[10px] uppercase font-black tracking-widest">Sanctions</p>
+                  </div>
+                  <p className="text-sm text-yellow-500 font-bold">{user.warnings || 0} Avertis.</p>
+                </div>
+              </div>
+
+              {/* Discord Section */}
+              <div className="bg-white/5 p-4 rounded-2xl border border-white/5 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest">Discord ID</p>
+                  <p className="text-sm text-indigo-400 font-mono">{user.provider_id || 'Non lié'}</p>
+                </div>
+                {user.provider_id && (
+                  <button onClick={() => { navigator.clipboard.writeText(user.provider_id!); showToast('ID Copié !'); }} className="p-2 hover:bg-white/10 rounded-lg transition-all text-gray-400 hover:text-white">
+                    <Copy size={16} />
+                  </button>
+                )}
+              </div>
+
+              {/* Admin Notes Area */}
+              <div className="space-y-2">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Notes Administrateur</label>
+                <textarea
+                  value={localNotes}
+                  onChange={(e) => setLocalNotes(e.target.value)}
+                  onBlur={() => onUpdateNotes(user.id, localNotes)}
+                  placeholder="Écrivez des notes sur ce joueur..."
+                  className="w-full h-32 bg-white/5 border border-white/10 rounded-2xl p-4 text-sm text-gray-300 focus:border-luxury-gold transition-all outline-none resize-none"
+                />
+              </div>
+
+              {/* Actions Menu */}
+              <div className="space-y-4">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Actions de Modération</label>
+                <div className="grid grid-cols-1 gap-3">
+                  <div className="flex gap-3">
+                    {user.banned ? (
+                      <button onClick={() => onUnban(user)} className="flex-1 bg-green-500/10 hover:bg-green-500/20 text-green-500 py-3 rounded-xl font-bold uppercase text-[10px] transition-all flex items-center justify-center gap-2 border border-green-500/20">
+                        <ShieldCheck size={16} /> Débannir
+                      </button>
+                    ) : (
+                      <button onClick={() => onBan(user)} className="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-500 py-3 rounded-xl font-bold uppercase text-[10px] transition-all flex items-center justify-center gap-2 border border-red-500/20">
+                        <Activity size={16} /> Bannir
+                      </button>
+                    )}
+                    <button onClick={() => onWarn(user)} className="flex-1 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 py-3 rounded-xl font-bold uppercase text-[10px] transition-all flex items-center justify-center gap-2 border border-yellow-500/20">
+                      <Settings size={16} /> Warn
+                    </button>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button className="flex-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 py-3 rounded-xl font-bold uppercase text-[10px] transition-all flex items-center justify-center gap-2 border border-blue-500/10">
+                      <Send size={16} /> Message
+                    </button>
+                    {hasGPS && (
+                      <button
+                        onClick={() => {
+                          window.open(`https://www.google.com/maps?q=${user.latitude},${user.longitude}`, '_blank');
+                        }}
+                        className="flex-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 py-3 rounded-xl font-bold uppercase text-[10px] transition-all flex items-center justify-center gap-2 border border-cyan-500/10">
+                        <Activity size={16} /> Voir GPS
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3">
+                    {user.role === 'admin' ? (
+                      <button onClick={() => onRemoveAdmin(user)} className="flex-1 bg-gray-500/10 hover:bg-gray-500/20 text-gray-400 py-3 rounded-xl font-bold uppercase text-[10px] transition-all flex items-center justify-center gap-2 border border-white/5">
+                        Retirer Admin
+                      </button>
+                    ) : (
+                      <button onClick={() => onPromote(user)} className="flex-1 bg-luxury-gold/10 hover:bg-luxury-gold/20 text-luxury-gold py-3 rounded-xl font-bold uppercase text-[10px] transition-all flex items-center justify-center gap-2 border border-luxury-gold/20">
+                        Promouvoir Admin
+                      </button>
+                    )}
+                  </div>
+
+                  <button onClick={() => onDelete(user)} className="w-full bg-red-600/10 hover:bg-red-600/20 text-red-600 py-3 rounded-xl font-bold uppercase text-[10px] transition-all flex items-center justify-center gap-2 border border-red-600/20">
+                    <Trash2 size={16} /> Supprimer Définitivement
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Données Brutes (Auth.Users)</label>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(JSON.stringify(rawAuthData, null, 2)); showToast('JSON Copié !'); }}
+                  className="flex items-center gap-2 text-[10px] font-black text-luxury-gold hover:text-white transition-all uppercase"
+                >
+                  <Copy size={12} /> Copier
+                </button>
+              </div>
+              {loadingAuth ? (
+                <div className="flex items-center justify-center p-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-luxury-gold"></div>
+                </div>
+              ) : (
+                <div className="bg-black/50 border border-white/10 rounded-2xl p-6 font-mono text-[11px] text-green-400 overflow-x-auto whitespace-pre max-h-[400px]">
+                  {JSON.stringify(rawAuthData, null, 2)}
+                </div>
+              )}
+
+              <div className="p-4 bg-luxury-gold/5 border border-luxury-gold/20 rounded-xl">
+                <p className="text-[10px] text-luxury-gold leading-relaxed">
+                  <span className="font-black">Note :</span> Ces données proviennent directement de la table <b>auth.users</b> de Supabase. Elles incluent les métadonnées Discord complètes (avatar original, full name) et les informations de session internes.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </>
   );
 };
 
@@ -81,6 +421,11 @@ const Admin: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'user'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'banned'>('all');
   const [locationFilter, setLocationFilter] = useState<'all' | 'with' | 'without'>('all');
+  const [isOnlineOnly, setIsOnlineOnly] = useState(false);
+  const [showSanctionsOnly, setShowSanctionsOnly] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
+  const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
+
 
   // Admin logs state
   const [adminLogs, setAdminLogs] = useState<any[]>([]);
@@ -163,6 +508,23 @@ const Admin: React.FC = () => {
       fetchTickets();
       fetchMusicSettings();
       fetchMusicHistory();
+
+      // Realtime subscription for users
+      const channel = supabase
+        .channel('admin-profiles-changes')
+        .on(
+          'postgres_changes',
+          { event: '*', table: 'profiles', schema: 'public' },
+          (payload) => {
+            console.log('🔄 Realtime update received:', payload);
+            fetchUsers(); // Refresh list on any change
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     });
   }, [navigate]);
 
@@ -206,7 +568,7 @@ const Admin: React.FC = () => {
       const { data: profiles, error } = await supabase
         .from('profiles')
         .select('*');
-      
+
       if (error) {
         console.error('Erreur chargement profils:', error);
         setLoading(false);
@@ -240,12 +602,14 @@ const Admin: React.FC = () => {
     // Récupérer le nom d'utilisateur pour le log
     const user = users.find(u => u.id === userId);
     const username = user?.username || 'Unknown';
-    
+
+    if (!window.confirm(`Voulez-vous vraiment promouvoir ${username} en Administrateur ?`)) return;
+
     const { error } = await supabase
       .from('profiles')
       .update({ role: 'admin' })
       .eq('id', userId);
-    
+
     if (!error) {
       // Log l'action
       await logAdminAction('promote_admin', `⬆️ Promotion de ${username} en administrateur`, 'user', username);
@@ -261,7 +625,7 @@ const Admin: React.FC = () => {
       .from('profiles')
       .update({ can_edit_profile: newState })
       .eq('id', userId);
-    
+
     if (!error) {
       // Log l'action
       const action = newState ? '🔓 Autoriser modifications de profil' : '🔒 Bloquer modifications de profil';
@@ -295,7 +659,7 @@ const Admin: React.FC = () => {
       setPageVisibilityLoading(true);
       console.log('🔄 DÉBUT UPDATE - pageId:', pageId, 'isVisible:', isVisible);
       console.log('📤 Envoi de la requête Supabase UPDATE...');
-      
+
       // Utiliser l'UPDATE direct (RLS disabled)
       const { error } = await supabase
         .from('page_visibility')
@@ -314,9 +678,9 @@ const Admin: React.FC = () => {
         ...prev,
         [pageId]: isVisible,
       }));
-      
+
       console.log('✅ SUCCESS COMPLET');
-      
+
       // Log l'action
       const pageNames: { [key: string]: string } = {
         'page-home': 'Accueil',
@@ -369,8 +733,8 @@ const Admin: React.FC = () => {
       // Mettre à jour le setting principal
       const { error: settingError } = await supabase
         .from('settings')
-        .upsert({ 
-          key: 'site_background', 
+        .upsert({
+          key: 'site_background',
           value: historyEntry.background_url,
           type: historyEntry.background_type
         }, { onConflict: 'key' });
@@ -473,6 +837,7 @@ const Admin: React.FC = () => {
 
   // Supprimer un utilisateur
   const deleteUser = async (userId: string, username: string) => {
+    if (!window.confirm(`⚠️ ATTENTION: Voulez-vous vraiment SUPPRIMER DÉFINITIVEMENT le compte de ${username} ? Cette action est irréversible.`)) return;
     const { error } = await supabase
       .from('profiles')
       .delete()
@@ -480,7 +845,7 @@ const Admin: React.FC = () => {
     if (!error) {
       // Log l'action (avant de potentiellement se déconnecter)
       await logAdminAction('delete_user', `🗑️ Suppression de l'utilisateur ${username}`, 'user', username);
-      
+
       // Si l'utilisateur supprimé est l'utilisateur courant, déconnexion immédiate
       const currentSession = await supabase.auth.getSession();
       const currentUserId = currentSession?.data?.session?.user?.id;
@@ -495,8 +860,26 @@ const Admin: React.FC = () => {
     }
   };
 
+  const handleGlobalSync = async () => {
+    if (!window.confirm("Voulez-vous synchroniser les Avatars et IDs Discord pour TOUTE la base de données ? (Récupère les données de auth.users)")) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.rpc('sync_all_discord_data');
+      if (error) throw error;
+      showToast("✅ Synchronisation globale terminée !");
+      fetchUsers();
+    } catch (err: any) {
+      console.error(err);
+      alert("Erreur: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Retirer le rôle admin
   const removeAdmin = async (userId: string, username: string) => {
+    if (!window.confirm(`Voulez-vous vraiment retirer les droits d'administrateur à ${username} ?`)) return;
     const { error } = await supabase
       .from('profiles')
       .update({ role: 'user' })
@@ -509,11 +892,12 @@ const Admin: React.FC = () => {
   };
 
   const banUser = async (userId: string, username: string) => {
+    if (!window.confirm(`Êtes-vous sûr de vouloir BANNIR l'utilisateur ${username} ?`)) return;
     const { error } = await supabase
       .from('profiles')
       .update({ banned: true })
       .eq('id', userId);
-    
+
     if (!error) {
       // Log l'action
       await logAdminAction('ban_user', `🚫 Bannissement de l'utilisateur ${username}`, 'user', username);
@@ -528,7 +912,7 @@ const Admin: React.FC = () => {
       .from('profiles')
       .update({ banned: false })
       .eq('id', userId);
-    
+
     if (!error) {
       // Log l'action
       await logAdminAction('unban_user', `✅ Débannissement de l'utilisateur ${username}`, 'user', username);
@@ -538,10 +922,37 @@ const Admin: React.FC = () => {
     }
   };
 
+  const warnUser = async (user: Profile) => {
+    const currentWarnings = user.warnings || 0;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ warnings: currentWarnings + 1 })
+      .eq('id', user.id);
+
+    if (!error) {
+      await logAdminAction('warn_user', `⚠️ Avertissement donné à ${user.username} (Total: ${currentWarnings + 1})`, 'user', user.username);
+      fetchUsers();
+      showToast(`⚠️ Avertissement envoyé à ${user.username}`);
+    }
+  };
+
+  const updateAdminNotes = async (userId: string, notes: string) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ admin_notes: notes })
+      .eq('id', userId);
+
+    if (!error) {
+      console.log('✅ Notes admin mises à jour');
+      // No need to fetchUsers for notes to avoid lag while typing
+    }
+  };
+
+
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !content || !mediaUrl) return console.log('Remplissez tous les champs (URL requise)');
-    
+
     setSubmitting(true);
     try {
       const { data, error } = await supabase
@@ -574,7 +985,7 @@ const Admin: React.FC = () => {
 
   const deletePost = async (postId: number) => {
     if (!confirm('Êtes-vous sûr de supprimer ce post ?')) return;
-    
+
     try {
       const { error } = await supabase
         .from('posts')
@@ -611,7 +1022,7 @@ const Admin: React.FC = () => {
     e.preventDefault();
     if (!editingPost) return;
     if (!title || !content || !mediaUrl) return console.log('Remplissez tous les champs');
-    
+
     setSubmitting(true);
     try {
       const { error } = await supabase
@@ -641,7 +1052,7 @@ const Admin: React.FC = () => {
   const handleUpdateBackground = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bgUrl) return console.log('Entrez une URL valide');
-    
+
     setBgSubmitting(true);
     try {
       // Récupérer l'ID de l'utilisateur actuel
@@ -654,8 +1065,8 @@ const Admin: React.FC = () => {
       // 1. Mettre à jour le setting principal
       const { error: settingError } = await supabase
         .from('settings')
-        .upsert({ 
-          key: 'site_background', 
+        .upsert({
+          key: 'site_background',
           value: bgUrl,
           type: bgType
         }, { onConflict: 'key' });
@@ -701,7 +1112,7 @@ const Admin: React.FC = () => {
       }
 
       console.log('✅ Fond d\'écran mis à jour avec succès !');
-      
+
       // Log l'action
       await logAdminAction(
         'background_update',
@@ -710,9 +1121,9 @@ const Admin: React.FC = () => {
         bgType === 'video' ? 'Vidéo' : 'Image',
         { url: bgUrl, type: bgType }
       );
-      
+
       setBgUrl('');
-      
+
       // Recharger l'historique
       console.log('🔄 Rechargement historique...');
       await fetchBackgroundHistory();
@@ -849,12 +1260,12 @@ const Admin: React.FC = () => {
       if (error) throw error;
 
       await logAdminAction('add_admin', `👤 Ajout de ${newAdminUsername} en ${newAdminRole}`, 'admin', newAdminUsername);
-      
+
       setNewAdminUsername('');
       setNewAdminAvatar('');
       setNewAdminRole('');
       setNewAdminPriority('');
-      
+
       fetchAdminTeam();
     } catch (error: any) {
       console.log(`Erreur: ${error.message}`);
@@ -873,7 +1284,7 @@ const Admin: React.FC = () => {
       if (error) throw error;
 
       await logAdminAction('delete_admin', `🗑️ Suppression de ${username} de la pyramide d'administration`, 'admin', username);
-      
+
       fetchAdminTeam();
     } catch (error: any) {
       alert(`Erreur: ${error.message}`);
@@ -918,7 +1329,7 @@ const Admin: React.FC = () => {
       if (data && data.length > 0) {
         setComments([data[0], ...comments]);
       }
-      
+
       // Log the action
       await logAdminAction('comment_added', `💬 Nouveau commentaire de ${username}`, 'comment', username);
     } catch (error: any) {
@@ -964,12 +1375,12 @@ const Admin: React.FC = () => {
       if (error) throw error;
 
       await logAdminAction('add_role', `🎭 Création du rôle "${newRoleName}"`, 'role', newRoleName);
-      
+
       setNewRoleName('');
       setNewRoleEmoji('👤');
       setNewRoleDescription('');
       setNewRoleColor('#D4AF37');
-      
+
       fetchRoles();
     } catch (error: any) {
       console.log(`Erreur: ${error.message}`);
@@ -988,7 +1399,7 @@ const Admin: React.FC = () => {
       if (error) throw error;
 
       await logAdminAction('delete_role', `🗑️ Suppression du rôle "${roleName}"`, 'role', roleName);
-      
+
       fetchRoles();
     } catch (error: any) {
       alert(`Erreur: ${error.message}`);
@@ -1005,7 +1416,7 @@ const Admin: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
+
       // Enrichir les tickets avec le display_name depuis les profils
       const enrichedTickets = await Promise.all(
         (data || []).map(async (ticket: any) => {
@@ -1015,7 +1426,7 @@ const Admin: React.FC = () => {
               .select('display_name, username')
               .eq('id', ticket.user_id)
               .single();
-            
+
             return {
               ...ticket,
               display_name: profile?.display_name || profile?.username || ticket.username || 'Utilisateur'
@@ -1025,7 +1436,7 @@ const Admin: React.FC = () => {
           }
         })
       );
-      
+
       setTickets(enrichedTickets);
     } catch (error) {
       console.error('Error fetching tickets:', error);
@@ -1038,7 +1449,7 @@ const Admin: React.FC = () => {
     try {
       const { error } = await supabase
         .from('tickets')
-        .update({ 
+        .update({
           status: newStatus,
           updated_at: new Date().toISOString(),
           resolved_by: profile?.id,
@@ -1049,7 +1460,7 @@ const Admin: React.FC = () => {
       if (error) throw error;
 
       await logAdminAction('ticket_status_update', `🎫 Mise à jour du ticket statut: ${newStatus}`, 'ticket', ticketId);
-      
+
       fetchTickets();
       if (selectedTicket?.id === ticketId) {
         setSelectedTicket({ ...selectedTicket, status: newStatus });
@@ -1077,7 +1488,7 @@ const Admin: React.FC = () => {
       if (error) throw error;
 
       await logAdminAction('delete_ticket', `🗑️ Suppression du ticket ${ticketId.substring(0, 8)}`, 'ticket', ticketId);
-      
+
       setTickets(tickets.filter(t => t.id !== ticketId));
       setSelectedTicket(null);
     } catch (error: any) {
@@ -1144,7 +1555,7 @@ const Admin: React.FC = () => {
       if (error) throw error;
 
       setSelectedTicket({ ...selectedTicket, allow_user_replies: !currentState });
-      setTickets(tickets.map(t => 
+      setTickets(tickets.map(t =>
         t.id === ticketId ? { ...t, allow_user_replies: !currentState } : t
       ));
 
@@ -1205,10 +1616,10 @@ const Admin: React.FC = () => {
 
       setMusicUrl(url);
       setMusicName(name);
-      await logAdminAction('music_update', `🎵 Mise à jour: ${name}`, 'music', name, { 
-        musicUrl: url, 
+      await logAdminAction('music_update', `🎵 Mise à jour: ${name}`, 'music', name, {
+        musicUrl: url,
         musicName: name,
-        fileName: url.split('/').pop() 
+        fileName: url.split('/').pop()
       });
       console.log('✅ Musique mise à jour!');
     } catch (error: any) {
@@ -1242,10 +1653,10 @@ const Admin: React.FC = () => {
       if (error) throw error;
 
       setIsPlayingMusic(newPlayingState);
-      await logAdminAction('music_toggle', `🎵 Musique ${newPlayingState ? 'activée' : 'désactivée'}`, 'music', existingData[0].music_name, { 
-        musicUrl: existingData[0].music_url, 
+      await logAdminAction('music_toggle', `🎵 Musique ${newPlayingState ? 'activée' : 'désactivée'}`, 'music', existingData[0].music_name, {
+        musicUrl: existingData[0].music_url,
         musicName: existingData[0].music_name,
-        fileName: existingData[0].music_url?.split('/').pop() 
+        fileName: existingData[0].music_url?.split('/').pop()
       });
       console.log(`✅ Musique ${newPlayingState ? 'lancée' : 'mise en pause'}!`);
     } catch (error: any) {
@@ -1286,7 +1697,7 @@ const Admin: React.FC = () => {
         .replace(/[ç]/g, 'c')
         .replace(/[^a-z0-9.]/gi, '_')  // Remplacer les caractères spéciaux par _
         .toLowerCase();
-      
+
       const fileName = `music_${timestamp}_${normalizedName}`;
 
       // Simuler une progression réelle basée sur la taille du fichier
@@ -1300,7 +1711,7 @@ const Admin: React.FC = () => {
         uploadedBytes = Math.min(uploadedBytes + (Math.random() * fileSize * 0.15), fileSize * 0.95);
         const progress = Math.floor((uploadedBytes / fileSize) * 100);
         const uploadedMB = (uploadedBytes / (1024 * 1024)).toFixed(2);
-        
+
         setUploadProgress(progress);
 
         // Calculer le temps restant
@@ -1313,8 +1724,8 @@ const Admin: React.FC = () => {
           const minutes = Math.floor(remainingSeconds / 60);
           const seconds = Math.floor(remainingSeconds % 60);
           setUploadTimeRemaining(
-            minutes > 0 
-              ? `${minutes}m ${seconds}s` 
+            minutes > 0
+              ? `${minutes}m ${seconds}s`
               : `${seconds}s`
           );
         }
@@ -1344,11 +1755,11 @@ const Admin: React.FC = () => {
         .getPublicUrl(fileName);
 
       console.log('✅ Fichier uploadé:', publicUrl.publicUrl);
-      
+
       // ⚠️ VALIDATION: Vérifier que l'URL est bien de Supabase
-      if (!publicUrl.publicUrl.includes('supabase.co') || 
-          !publicUrl.publicUrl.includes('/storage/') ||
-          !publicUrl.publicUrl.includes('public/music/')) {
+      if (!publicUrl.publicUrl.includes('supabase.co') ||
+        !publicUrl.publicUrl.includes('/storage/') ||
+        !publicUrl.publicUrl.includes('public/music/')) {
         throw new Error('❌ URL de fichier invalide - non-Supabase');
       }
 
@@ -1368,9 +1779,9 @@ const Admin: React.FC = () => {
 
       const { error: updateError } = await supabase
         .from('site_music')
-        .update({ 
-          music_url: publicUrl.publicUrl, 
-          music_name: musicName 
+        .update({
+          music_url: publicUrl.publicUrl,
+          music_name: musicName
         })
         .eq('id', existingData[0].id);
 
@@ -1378,12 +1789,12 @@ const Admin: React.FC = () => {
 
       setMusicUrl(publicUrl.publicUrl);
       setMusicFile(null);
-      await logAdminAction('music_upload', `🎵 Upload de musique: ${musicName}`, 'music', musicName, { 
-        musicUrl: publicUrl.publicUrl, 
+      await logAdminAction('music_upload', `🎵 Upload de musique: ${musicName}`, 'music', musicName, {
+        musicUrl: publicUrl.publicUrl,
         musicName: musicName,
         fileName: publicUrl.publicUrl.split('/').pop()
       });
-      
+
       // Attendre un bit pour afficher 100%
       setTimeout(() => {
         setUploadProgress(0);
@@ -1392,16 +1803,16 @@ const Admin: React.FC = () => {
       }, 500);
     } catch (error: any) {
       console.error('❌ Erreur upload:', error);
-      
+
       // Afficher un message d'erreur clair
       let errorMessage = error.message || 'Erreur inconnue';
-      
+
       if (error.message?.includes('Bucket not found')) {
         errorMessage = '❌ Le bucket "music" n\'existe pas dans Supabase Storage.\n\nSolution:\n1. Allez à: Supabase Dashboard → Storage\n2. Cliquez "New bucket"\n3. Nom: music\n4. Cochez "Public bucket"\n5. Créez le bucket';
       } else if (error.message?.includes('Invalid key')) {
         errorMessage = '❌ Le nom du fichier contient des caractères invalides.\n\nAssurez-vous que le nom contient uniquement des caractères simples (a-z, 0-9).';
       }
-      
+
       console.log(`Erreur: ${errorMessage}`);
       setUploadProgress(0);
       setUploadTimeRemaining('');
@@ -1454,33 +1865,36 @@ const Admin: React.FC = () => {
               <p className="text-gray-500 uppercase tracking-widest text-[10px] font-bold">Gestion Atlantique RP</p>
             </div>
           </div>
-          
+
           <div className="flex gap-2 p-1 glass rounded-xl">
-            <button 
+            <button
               onClick={() => setActiveTab('users')}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'users' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
             >
               <Users size={16} /> Utilisateurs
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('posts')}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'posts' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
             >
               <FilePlus size={16} /> Posts
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('rules')}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'rules' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
             >
               <BookOpen size={16} /> Règles
             </button>
-            <button 
-              onClick={() => setActiveTab('config')}
+            <button
+              onClick={() => {
+                setActiveTab('config');
+                fetchAdminTeam();
+              }}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'config' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
             >
               <Settings size={16} /> Config
             </button>
-            <button 
+            <button
               onClick={() => {
                 setActiveTab('logs');
                 fetchAdminLogs();
@@ -1489,7 +1903,7 @@ const Admin: React.FC = () => {
             >
               <Activity size={16} /> Logs
             </button>
-            <button 
+            <button
               onClick={() => {
                 setActiveTab('tickets');
                 fetchTickets();
@@ -1498,7 +1912,7 @@ const Admin: React.FC = () => {
             >
               <Ticket size={16} /> Tickets
             </button>
-            <button 
+            <button
               onClick={() => {
                 setActiveTab('music');
                 fetchMusicSettings();
@@ -1511,259 +1925,128 @@ const Admin: React.FC = () => {
         </header>
 
         {activeTab === 'users' && (
-          <div>
-            {/* Filtres et Recherche */}
-            <div className="glass rounded-3xl overflow-hidden border border-white/5 mb-6 p-6">
-              <div className="space-y-6">
-                {/* Search Bar */}
-                <div>
-                  <input
-                    type="text"
-                    placeholder="🔍 Chercher un utilisateur..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full px-4 py-3 rounded-lg bg-black/50 border border-white/10 focus:border-luxury-gold text-white placeholder-gray-500 outline-none transition-all text-sm"
-                  />
+          <div className="relative">
+            {/* Barre de recherche et filtres de modération */}
+            <div className="glass rounded-3xl border border-white/5 mb-8 p-6">
+              <div className="flex flex-col lg:flex-row gap-6 items-center">
+                <div className="flex-1 w-full">
+                  <div className="relative group">
+                    <Activity className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-luxury-gold transition-colors" size={20} />
+                    <input
+                      type="text"
+                      placeholder="Rechercher par pseudo, ID ou Discord ID..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-12 pr-4 py-4 rounded-2xl bg-black border border-white/10 focus:border-luxury-gold text-white outline-none transition-all"
+                    />
+                  </div>
                 </div>
 
-                {/* Toggle Filters */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                  {/* Role Filter - Toggle */}
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-bold uppercase tracking-widest text-gray-300">👑 Admin Seulement</label>
-                    <motion.button
-                      onClick={() => setRoleFilter(roleFilter === 'admin' ? 'all' : 'admin')}
-                      className="relative w-16 h-8 rounded-full transition-colors"
-                      style={{
-                        backgroundColor: roleFilter === 'admin' ? '#10b981' : '#6b7280'
-                      }}
-                    >
-                      <motion.div
-                        className="absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-lg"
-                        animate={{
-                          x: roleFilter === 'admin' ? 32 : 0
-                        }}
-                        transition={{
-                          type: 'spring',
-                          stiffness: 500,
-                          damping: 40
-                        }}
-                      />
-                    </motion.button>
-                  </div>
-
-                  {/* Status Filter - Toggle */}
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-bold uppercase tracking-widest text-gray-300">🚫 Afficher Bannis</label>
-                    <motion.button
-                      onClick={() => setStatusFilter(statusFilter === 'banned' ? 'all' : 'banned')}
-                      className="relative w-16 h-8 rounded-full transition-colors"
-                      style={{
-                        backgroundColor: statusFilter === 'banned' ? '#ef4444' : '#6b7280'
-                      }}
-                    >
-                      <motion.div
-                        className="absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-lg"
-                        animate={{
-                          x: statusFilter === 'banned' ? 32 : 0
-                        }}
-                        transition={{
-                          type: 'spring',
-                          stiffness: 500,
-                          damping: 40
-                        }}
-                      />
-                    </motion.button>
-                  </div>
-
-                  {/* Location Filter - Toggle */}
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-bold uppercase tracking-widest text-gray-300">📍 Avec Localisation</label>
-                    <motion.button
-                      onClick={() => setLocationFilter(locationFilter === 'with' ? 'all' : 'with')}
-                      className="relative w-16 h-8 rounded-full transition-colors"
-                      style={{
-                        backgroundColor: locationFilter === 'with' ? '#06b6d4' : '#6b7280'
-                      }}
-                    >
-                      <motion.div
-                        className="absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-lg"
-                        animate={{
-                          x: locationFilter === 'with' ? 32 : 0
-                        }}
-                        transition={{
-                          type: 'spring',
-                          stiffness: 500,
-                          damping: 40
-                        }}
-                      />
-                    </motion.button>
-                  </div>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  <button
+                    onClick={() => setIsOnlineOnly(!isOnlineOnly)}
+                    className={`px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${isOnlineOnly ? 'bg-green-500 border-green-400 text-white shadow-[0_0_10px_rgba(34,197,94,0.3)]' : 'bg-white/5 border-white/10 text-gray-400'}`}
+                  >
+                    🟢 En ligne
+                  </button>
+                  <button
+                    onClick={() => setRoleFilter(roleFilter === 'admin' ? 'all' : 'admin')}
+                    className={`px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${roleFilter === 'admin' ? 'bg-luxury-gold border-luxury-goldLight text-black' : 'bg-white/5 border-white/10 text-gray-400'}`}
+                  >
+                    👑 Admins
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter(statusFilter === 'banned' ? 'all' : 'banned')}
+                    className={`px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${statusFilter === 'banned' ? 'bg-red-500 border-red-400 text-white' : 'bg-white/5 border-white/10 text-gray-400'}`}
+                  >
+                    🚫 Bannis
+                  </button>
+                  <button
+                    onClick={() => setLocationFilter(locationFilter === 'with' ? 'all' : 'with')}
+                    className={`px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${locationFilter === 'with' ? 'bg-cyan-500 border-cyan-400 text-white' : 'bg-white/5 border-white/10 text-gray-400'}`}
+                  >
+                    📍 GPS Actif
+                  </button>
                 </div>
               </div>
             </div>
 
-            {/* Tableau */}
-            <div className="glass rounded-3xl overflow-hidden border border-white/5">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-white/10 bg-white/5">
-                  <th className="px-6 py-4 text-sm font-bold uppercase tracking-widest text-gray-400 w-1/4">Utilisateur</th>
-                  <th className="px-6 py-4 text-sm font-bold uppercase tracking-widest text-gray-400 w-1/6 text-center">Rôle</th>
-                  <th className="px-6 py-4 text-sm font-bold uppercase tracking-widest text-gray-400 w-1/6 text-center">Statut</th>
-                  <th className="px-6 py-4 text-sm font-bold uppercase tracking-widest text-gray-400 w-1/5 text-center">Localisation</th>
-                  <th className="px-6 py-4 text-sm font-bold uppercase tracking-widest text-gray-400 w-1/6 text-center">Créé le</th>
-                  <th className="px-6 py-4 text-sm font-bold uppercase tracking-widest text-gray-400 w-1/6 text-center">Discord ID</th>
-                  <th className="px-6 py-4 text-sm font-bold uppercase tracking-widest text-gray-400 w-1/5 text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {users
-                  .filter((user) => {
-                    // Filtre recherche
-                    const searchMatch = (user.display_name || user.username || user.email || '')
-                      .toLowerCase()
-                      .includes(searchTerm.toLowerCase());
+            {/* Grille de cartes utilisateurs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {users
+                .filter(user => {
+                  const s = searchTerm.toLowerCase();
+                  const matchSearch =
+                    (user.username?.toLowerCase() || '').includes(s) ||
+                    (user.display_name?.toLowerCase() || '').includes(s) ||
+                    (user.id?.toLowerCase() || '').includes(s) ||
+                    (user.provider_id?.toLowerCase() || '').includes(s);
 
-                    // Filtre rôle
-                    const roleMatch =
-                      roleFilter === 'all' || user.role === roleFilter;
+                  if (!matchSearch) return false;
 
-                    // Filtre statut
-                    const statusMatch =
-                      statusFilter === 'all' ||
-                      (statusFilter === 'active' && !user.banned) ||
-                      (statusFilter === 'banned' && user.banned);
+                  const isActuallyOnline = user.last_seen && (Date.now() - new Date(user.last_seen).getTime() < 120000);
+                  if (isOnlineOnly && !isActuallyOnline) return false;
+                  if (roleFilter === 'admin' && user.role !== 'admin') return false;
+                  if (statusFilter === 'banned' && !user.banned) return false;
+                  if (locationFilter === 'with' && (!user.latitude || !user.longitude)) return false;
 
-                    // Filtre localisation
-                    const hasLocation = user.latitude && user.longitude;
-                    const locationMatch =
-                      locationFilter === 'all' ||
-                      (locationFilter === 'with' && hasLocation) ||
-                      (locationFilter === 'without' && !hasLocation);
+                  return true;
+                })
+                .sort((a, b) => {
+                  const aOnline = a.last_seen && (Date.now() - new Date(a.last_seen).getTime() < 120000);
+                  const bOnline = b.last_seen && (Date.now() - new Date(b.last_seen).getTime() < 120000);
 
-                    return searchMatch && roleMatch && statusMatch && locationMatch;
-                  })
-                  .map((user) => (
-                  <tr key={user.id} className={`hover:bg-white/5 transition-colors ${user.banned ? 'opacity-60' : ''}`}>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        {user.avatar_url ? (
-                          <img 
-                            src={user.avatar_url} 
-                            alt={user.display_name || user.username}
-                            className="w-10 h-10 rounded-full object-cover border border-white/10 flex-shrink-0"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-luxury-gold/20 flex items-center justify-center text-luxury-gold font-bold flex-shrink-0">
-                            {(user.display_name || user.username).charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        <span className="font-bold text-white truncate">{user.display_name || user.username}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest inline-block ${user.role === 'admin' ? 'bg-luxury-gold/20 text-luxury-gold' : 'bg-white/10 text-gray-400'}`}>
-                        {user.role}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      {user.banned ? (
-                        <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-red-500/20 text-red-400 inline-block">
-                          🚫 Banni
-                        </span>
-                      ) : (
-                        <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-green-500/20 text-green-400 inline-block">
-                          ✓ Actif
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <LocationDisplay 
-                        latitude={user.latitude}
-                        longitude={user.longitude}
-                        linkClassName="text-luxury-gold hover:text-luxury-goldLight text-xs font-bold uppercase tracking-widest underline"
-                      />
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <span className="text-xs text-gray-400 block">
-                        {user.created_at ? new Date(user.created_at).toLocaleDateString('fr-FR', { 
-                          year: 'numeric', 
-                          month: 'numeric', 
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        }) : 'N/A'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      {user.provider_id ? (
-                        <CopyProviderIdButton providerId={user.provider_id} />
-                      ) : (
-                        <span className="px-3 py-2 rounded-lg bg-gray-500/10 text-gray-500 text-xs font-bold uppercase tracking-widest inline-block cursor-not-allowed">
-                          ❌ Pas Discord
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 justify-center flex-wrap">
-                        {/* Toggle Edit Profile Permission */}
-                        <button
-                          onClick={() => toggleEditProfilePermission(user.id, user.username, user.can_edit_profile)}
-                          className={`px-3 py-2 rounded-lg transition-all text-xs font-bold uppercase tracking-widest ${
-                            user.can_edit_profile 
-                              ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/40' 
-                              : 'bg-gray-500/20 text-gray-400 hover:bg-gray-500/40'
-                          }`}
-                          title={user.can_edit_profile ? 'Bloquer modifications' : 'Autoriser modifications'}
-                        >
-                          {user.can_edit_profile ? '🔓 Édition' : '🔒 Bloqué'}
-                        </button>
+                  // Online users FIRST
+                  if (aOnline && !bOnline) return -1;
+                  if (!aOnline && bOnline) return 1;
 
-                        {user.role !== 'admin' && !user.banned && (
-                          <button 
-                            onClick={() => promoteAdmin(user.id)}
-                            className="px-3 py-2 rounded-lg bg-luxury-gold/10 text-luxury-gold hover:bg-luxury-gold hover:text-black transition-all text-xs font-bold uppercase tracking-widest"
-                          >
-                            <ShieldCheck size={14} />
-                          </button>
-                        )}
-                        {user.role === 'admin' && (
-                          <button
-                            onClick={() => removeAdmin(user.id, user.username)}
-                            className="px-3 py-2 rounded-lg bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/40 transition-all text-xs font-bold uppercase tracking-widest"
-                          >
-                            Retirer Admin
-                          </button>
-                        )}
-                        {user.banned ? (
-                          <button 
-                            onClick={() => unbanUser(user.id, user.username)}
-                            className="px-3 py-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/40 transition-all text-xs font-bold uppercase tracking-widest"
-                          >
-                            Débannir
-                          </button>
-                        ) : (
-                          <button 
-                            onClick={() => banUser(user.id, user.username)}
-                            className="px-3 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/40 transition-all text-xs font-bold uppercase tracking-widest flex items-center gap-1"
-                          >
-                            <Trash2 size={14} /> Bannir
-                          </button>
-                        )}
-                        <button
-                          onClick={() => deleteUser(user.id, user.username)}
-                          className="px-3 py-2 rounded-lg bg-red-700/20 text-red-700 hover:bg-red-700/40 transition-all text-xs font-bold uppercase tracking-widest ml-2"
-                        >
-                          Supprimer
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                  // Then by last seen
+                  const dateA = a.last_seen ? new Date(a.last_seen).getTime() : 0;
+                  const dateB = b.last_seen ? new Date(b.last_seen).getTime() : 0;
+                  return dateB - dateA;
+                })
+                .map(user => (
+                  <UserCard
+                    key={user.id}
+                    user={user}
+                    onClick={(u) => {
+                      setSelectedUser(u);
+                      setIsSidePanelOpen(true);
+                    }}
+                  />
                 ))}
-              </tbody>
-            </table>
             </div>
+
+            {/* Panneau latéral de détails */}
+            <UserSidePanel
+              user={selectedUser}
+              isOpen={isSidePanelOpen}
+              onClose={() => setIsSidePanelOpen(false)}
+              onBan={(u) => {
+                if (window.confirm(`Voulez-vous vraiment bannir ${u.username} ?`)) {
+                  banUser(u.id, u.username);
+                }
+              }}
+              onUnban={(u) => unbanUser(u.id, u.username)}
+              onWarn={(u) => warnUser(u)}
+              onDelete={(u) => {
+                if (window.confirm(`⚠️ ATTENTION: Voulez-vous supprimer DÉFINITIVEMENT ${u.username} ? Cette action est irréversible.`)) {
+                  deleteUser(u.id, u.username);
+                }
+              }}
+              onPromote={(u) => {
+                if (window.confirm(`Promouvoir ${u.username} au rang d'administrateur ?`)) {
+                  promoteAdmin(u.id);
+                }
+              }}
+              onRemoveAdmin={(u) => {
+                if (window.confirm(`Retirer les droits administrateur de ${u.username} ?`)) {
+                  removeAdmin(u.id, u.username);
+                }
+              }}
+              onUpdateNotes={updateAdminNotes}
+              onSync={fetchUsers}
+            />
           </div>
         )}
 
@@ -1810,7 +2093,7 @@ const Admin: React.FC = () => {
                     {submitting ? 'Envoi en cours...' : editingPost ? <>✓ Mettre à jour</> : <><Send size={20} /> Publier maintenant</>}
                   </button>
                   {editingPost && (
-                    <button 
+                    <button
                       type="button"
                       onClick={cancelEditPost}
                       className="flex-1 py-5 bg-gray-600 text-white font-black uppercase tracking-widest rounded-2xl transition-all hover:scale-[1.02]"
@@ -1899,7 +2182,7 @@ const Admin: React.FC = () => {
                     className="p-5 rounded-xl border border-white/10 bg-black/30 hover:bg-black/50 transition-all flex items-center justify-between"
                   >
                     <span className="font-bold uppercase tracking-widest text-sm">{label}</span>
-                    
+
                     {/* Toggle Switch */}
                     <motion.button
                       onClick={() => updatePageVisibility(pageId, !pageVisibilities[pageId])}
@@ -1953,10 +2236,10 @@ const Admin: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">URL</label>
-                  <input 
-                    type="url" 
-                    value={bgUrl} 
-                    onChange={(e) => setBgUrl(e.target.value)} 
+                  <input
+                    type="url"
+                    value={bgUrl}
+                    onChange={(e) => setBgUrl(e.target.value)}
                     required
                     className="w-full px-3 py-2 rounded-lg bg-black border border-white/10 focus:border-luxury-gold transition-all text-white outline-none text-sm"
                     placeholder="https://example.com/bg.jpg"
@@ -1975,17 +2258,17 @@ const Admin: React.FC = () => {
                   </a>
                 </div>
 
-                <button 
+                <button
                   type="submit"
-                    disabled={bgSubmitting || !bgUrl}
-                    className="w-full py-5 bg-luxury-gold text-black font-black uppercase tracking-widest rounded-2xl flex items-center justify-center gap-3 button-glow transition-all hover:scale-[1.02] disabled:opacity-50 disabled:grayscale"
-                  >
-                    {bgSubmitting ? 'Mise à jour en cours...' : (
-                      <>
-                        <ShieldCheck size={20} /> Appliquer les modifications
-                      </>
-                    )}
-                  </button>
+                  disabled={bgSubmitting || !bgUrl}
+                  className="w-full py-5 bg-luxury-gold text-black font-black uppercase tracking-widest rounded-2xl flex items-center justify-center gap-3 button-glow transition-all hover:scale-[1.02] disabled:opacity-50 disabled:grayscale"
+                >
+                  {bgSubmitting ? 'Mise à jour en cours...' : (
+                    <>
+                      <ShieldCheck size={20} /> Appliquer les modifications
+                    </>
+                  )}
+                </button>
               </div>
             </form>
 
@@ -2098,6 +2381,12 @@ const Admin: React.FC = () => {
                         placeholder="https://example.com/avatar.jpg"
                         className="w-full px-3 py-2 rounded-lg bg-black border border-white/10 focus:border-luxury-gold text-white outline-none text-xs"
                       />
+                      {newAdminAvatar && !newAdminAvatar.match(/\.(jpeg|jpg|gif|png|webp)$/i) && (
+                        <p className="text-yellow-500 text-[10px] mt-1 font-bold">
+                          ⚠️ Attention: Utilisez le "Lien Direct" (doit finir par .jpg, .png).
+                          <br />Sur PostImages/Imgur, copiez le lien qui se termine par l'extension.
+                        </p>
+                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -2122,13 +2411,14 @@ const Admin: React.FC = () => {
                           onChange={(e) => setNewAdminPriority(e.target.value)}
                           className="w-full px-3 py-2 rounded-lg bg-black border border-white/10 focus:border-luxury-gold text-white outline-none text-xs"
                         >
-                          <option value="">-- Sélectionner --</option>
+                          <option value="">-- Sélectionner un rôle --</option>
                           <option value="1">1 - Haut (Owner)</option>
-                          <option value="2">2 - Admins</option>
-                          <option value="3">3 - Modérateurs</option>
-                          <option value="4">4 - Support</option>
-                          <option value="5">5</option>
-                          <option value="6">6 - Bas</option>
+                          <option value="2">2 - CO-OWNER</option>
+                          <option value="3">3 - DIRECTOR</option>
+                          <option value="4">4 - SUPERVISOR</option>
+                          <option value="5">5 - MANAGER</option>
+                          <option value="6">6 - SENIOR-ADMIN</option>
+                          <option value="7">7 - ADMIN</option>
                         </select>
                       </div>
                     </div>
@@ -2319,7 +2609,7 @@ const Admin: React.FC = () => {
                 </div>
               </div>
             </div>
-            </div>
+          </div>
         )}
 
         {activeTab === 'rules' && (
@@ -2330,7 +2620,7 @@ const Admin: React.FC = () => {
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Nom</label>
-                  <input 
+                  <input
                     type="text"
                     value={newCategoryName}
                     onChange={(e) => setNewCategoryName(e.target.value)}
@@ -2340,7 +2630,7 @@ const Admin: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Description</label>
-                  <textarea 
+                  <textarea
                     value={newCategoryDesc}
                     onChange={(e) => setNewCategoryDesc(e.target.value)}
                     className="w-full px-6 py-3 rounded-xl bg-black border border-white/10 focus:border-luxury-gold text-white outline-none resize-none"
@@ -2360,7 +2650,7 @@ const Admin: React.FC = () => {
             {/* Categories & Rules */}
             <div className="space-y-6">
               <h3 className="text-xl font-cinzel font-bold text-white uppercase tracking-widest">Gérer les Règles</h3>
-              
+
               {categories.length === 0 ? (
                 <p className="text-gray-500">Aucune catégorie créée. Commencez par créer une catégorie.</p>
               ) : (
@@ -2408,14 +2698,14 @@ const Admin: React.FC = () => {
                     {/* Add Rule to this category */}
                     {selectedCategoryId === category.id && (
                       <div className="bg-black/50 border border-white/10 rounded-xl p-4 space-y-3">
-                        <input 
+                        <input
                           type="text"
                           value={newRuleTitle}
                           onChange={(e) => setNewRuleTitle(e.target.value)}
                           placeholder="Titre de la règle"
                           className="w-full px-4 py-2 rounded-lg bg-black border border-white/10 focus:border-luxury-gold text-white text-sm outline-none"
                         />
-                        <textarea 
+                        <textarea
                           value={newRuleContent}
                           onChange={(e) => setNewRuleContent(e.target.value)}
                           placeholder="Contenu de la règle"
@@ -2537,7 +2827,7 @@ const Admin: React.FC = () => {
                           <p className="text-sm font-bold text-luxury-gold">
                             👤 {log.admin_name || 'Administrateur'}
                           </p>
-                          
+
                           {/* Action description */}
                           <p className="text-white text-sm font-semibold mt-2">
                             {log.action_description}
@@ -2606,15 +2896,46 @@ const Admin: React.FC = () => {
 
                 {/* Filtre par status */}
                 <div className="mb-6 flex gap-2 flex-wrap items-center">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-luxury-gold/10 rounded-lg">
+                        <Users className="text-luxury-gold" size={24} />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-white tracking-tight">Gestion des Utilisateurs</h2>
+                        <p className="text-sm text-gray-400">{filteredUsers.length} utilisateurs trouvés</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleGlobalSync}
+                        className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-xl border border-indigo-500/20 text-xs font-black uppercase transition-all"
+                        title="Synchroniser avatars & IDs Discord pour tous les users"
+                      >
+                        <RefreshCcw size={14} className={loading ? 'animate-spin' : ''} />
+                        Sync Global
+                      </button>
+                      <button
+                        onClick={() => setIsOnlineOnly(!isOnlineOnly)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-black uppercase transition-all ${isOnlineOnly
+                          ? 'bg-green-500/20 border-green-500/40 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.1)]'
+                          : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                          }`}
+                      >
+                        <Activity size={14} />
+                        En ligne
+                      </button>
+                    </div>
+                  </div>
                   {['OUVERT', 'EN_COURS', 'RÉSOLU', 'FERMÉ'].map((status) => (
                     <button
                       key={status}
                       onClick={() => setTicketStatusFilter(status)}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold uppercase transition-all ${
-                        ticketStatusFilter === status
-                          ? 'bg-luxury-gold text-black'
-                          : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                      }`}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold uppercase transition-all ${ticketStatusFilter === status
+                        ? 'bg-luxury-gold text-black'
+                        : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                        }`}
                     >
                       {status}
                     </button>
@@ -2652,11 +2973,10 @@ const Admin: React.FC = () => {
                             setSelectedTicket(ticket);
                             fetchTicketMessages(ticket.id);
                           }}
-                          className={`w-full text-left p-4 rounded-lg transition-all border ${
-                            selectedTicket?.id === ticket.id
-                              ? 'bg-luxury-gold/20 border-luxury-gold'
-                              : 'bg-white/5 border-white/10 hover:bg-white/10'
-                          }`}
+                          className={`w-full text-left p-4 rounded-lg transition-all border ${selectedTicket?.id === ticket.id
+                            ? 'bg-luxury-gold/20 border-luxury-gold'
+                            : 'bg-white/5 border-white/10 hover:bg-white/10'
+                            }`}
                         >
                           <p className="text-sm font-bold text-white truncate">
                             {ticket.display_name || ticket.username || 'Anonyme'}
@@ -2665,12 +2985,11 @@ const Admin: React.FC = () => {
                             {ticket.description?.substring(0, 50)}...
                           </p>
                           <div className="flex items-center gap-2 mt-2">
-                            <span className={`px-2 py-1 rounded text-xs font-bold ${
-                              ticket.status === 'OUVERT' ? 'bg-yellow-500/20 text-yellow-400' :
+                            <span className={`px-2 py-1 rounded text-xs font-bold ${ticket.status === 'OUVERT' ? 'bg-yellow-500/20 text-yellow-400' :
                               ticket.status === 'EN_COURS' ? 'bg-blue-500/20 text-blue-400' :
-                              ticket.status === 'RÉSOLU' ? 'bg-green-500/20 text-green-400' :
-                              'bg-red-500/20 text-red-400'
-                            }`}>
+                                ticket.status === 'RÉSOLU' ? 'bg-green-500/20 text-green-400' :
+                                  'bg-red-500/20 text-red-400'
+                              }`}>
                               {ticket.status}
                             </span>
                           </div>
@@ -2695,12 +3014,11 @@ const Admin: React.FC = () => {
                           ID: {selectedTicket.id.substring(0, 8)}...
                         </p>
                       </div>
-                      <span className={`px-4 py-2 rounded-lg text-sm font-bold ${
-                        selectedTicket.status === 'OUVERT' ? 'bg-yellow-500/20 text-yellow-400' :
+                      <span className={`px-4 py-2 rounded-lg text-sm font-bold ${selectedTicket.status === 'OUVERT' ? 'bg-yellow-500/20 text-yellow-400' :
                         selectedTicket.status === 'EN_COURS' ? 'bg-blue-500/20 text-blue-400' :
-                        selectedTicket.status === 'RÉSOLU' ? 'bg-green-500/20 text-green-400' :
-                        'bg-red-500/20 text-red-400'
-                      }`}>
+                          selectedTicket.status === 'RÉSOLU' ? 'bg-green-500/20 text-green-400' :
+                            'bg-red-500/20 text-red-400'
+                        }`}>
                         {selectedTicket.status}
                       </span>
                     </div>
@@ -2739,7 +3057,7 @@ const Admin: React.FC = () => {
                         🔄 Actualiser
                       </button>
                     </div>
-                    
+
                     {ticketMessagesLoading ? (
                       <div className="flex items-center justify-center py-8">
                         <div className="w-6 h-6 border-2 border-luxury-gold border-t-transparent rounded-full animate-spin"></div>
@@ -2783,7 +3101,7 @@ const Admin: React.FC = () => {
                         <span className="text-gray-400">Permettre les réponses utilisateur</span>
                       </label>
                     </div>
-                    
+
                     <div className="space-y-3">
                       <textarea
                         value={adminReply}
@@ -3024,7 +3342,7 @@ const Admin: React.FC = () => {
                           </p>
                         </div>
                       </div>
-                      
+
                       {entry.details?.musicUrl && (
                         <div className="flex gap-2 flex-wrap">
                           <button

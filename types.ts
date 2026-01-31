@@ -4,12 +4,19 @@ export type UserRole = 'user' | 'admin';
 export interface Profile {
   id: string;
   username: string;
+  display_name?: string;
   role: UserRole;
   avatar_url?: string;
   banned?: boolean;
+  is_online?: boolean;
+  last_seen?: string;
+  warnings?: number;
+  admin_notes?: string;
   latitude?: number;
   longitude?: number;
   provider_id?: string;
+  created_at?: string;
+  can_edit_profile?: boolean;
 }
 
 export interface Post {
