@@ -48,7 +48,7 @@ const MediaContent: React.FC = () => {
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
     if (data) setProfile(data);
   };
@@ -82,18 +82,29 @@ const MediaContent: React.FC = () => {
       .order('created_at', { ascending: false });
 
     if (data) {
-      // Join with profiles to get usernames
-      const commentsWithUsernames = await Promise.all(
-        data.map(async (comment: any) => {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('username, display_name, avatar_url')
-            .eq('id', comment.user_id)
-            .single();
-          return { ...comment, username: profile?.display_name || profile?.username || 'Anonymous', avatar_url: profile?.avatar_url || DEFAULT_AVATAR };
-        })
-      );
-      setComments(commentsWithUsernames);
+      const userIds = Array.from(new Set(data.map((c: any) => c.user_id).filter(id => !!id)));
+
+      let profilesMap: Record<string, any> = {};
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, username, display_name, avatar_url')
+          .in('id', userIds);
+
+        profiles?.forEach(p => {
+          profilesMap[p.id] = p;
+        });
+      }
+
+      const commentsWithProfiles = data.map((comment: any) => {
+        const uProfile = profilesMap[comment.user_id];
+        return {
+          ...comment,
+          username: uProfile?.display_name || uProfile?.username || 'Anonymous',
+          avatar_url: uProfile?.avatar_url || DEFAULT_AVATAR
+        };
+      });
+      setComments(commentsWithProfiles);
     }
   };
 

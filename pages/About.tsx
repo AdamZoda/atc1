@@ -36,12 +36,11 @@ const About: React.FC = () => {
       setSession(session);
 
       if (session) {
-        // Récupérer le profil de l'utilisateur
         const { data: profile } = await supabase
           .from('profiles')
-          .select('username, display_name')
+          .select('username, display_name, avatar_url')
           .eq('id', session.user.id)
-          .single();
+          .maybeSingle();
 
         if (profile) {
           setUserProfile(profile);
@@ -59,9 +58,9 @@ const About: React.FC = () => {
       if (session) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('username, display_name')
+          .select('username, display_name, avatar_url')
           .eq('id', session.user.id)
-          .single();
+          .maybeSingle();
 
         if (profile) {
           setUserProfile(profile);
@@ -80,7 +79,7 @@ const About: React.FC = () => {
   const fetchComments = async () => {
     setCommentsLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data: rawComments, error } = await supabase
         .from('about_comments')
         .select('*')
         .eq('approved', true)
@@ -89,42 +88,44 @@ const About: React.FC = () => {
 
       if (error) {
         console.error('❌ Erreur chargement commentaires:', error);
-      } else {
-        // Enrichir les commentaires avec display_name et avatar depuis les profils si nécessaire
-        const enrichedComments = await Promise.all(
-          (data || []).map(async (comment: any) => {
-            // Si display_name est vide ou pas défini, chercher le vrai nom et avatar
-            if (!comment.display_name || comment.display_name.trim() === '' || !comment.avatar_url) {
-              try {
-                let displayName = null;
-                let avatarUrl = null;
-
-                // Si on a user_id, chercher dans profiles
-                if (comment.user_id) {
-                  const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('display_name, username, avatar_url')
-                    .eq('id', comment.user_id)
-                    .single();
-                  displayName = profile?.display_name || profile?.username;
-                  avatarUrl = profile?.avatar_url;
-                }
-
-                return {
-                  ...comment,
-                  display_name: displayName || comment.display_name || comment.username || 'Utilisateur',
-                  avatar_url: avatarUrl || comment.avatar_url || null
-                };
-              } catch (err) {
-                console.error('Erreur enrichissement:', err);
-              }
-            }
-            return comment;
-          })
-        );
-        setComments(enrichedComments);
-        console.log('✅ Commentaires chargés:', enrichedComments?.length);
+        return;
       }
+
+      const commentsToEnrich = rawComments || [];
+
+      // 1. Collecter tous les user_ids qui ont besoin d'être enrichis
+      const userIdsToFetch = Array.from(new Set(
+        commentsToEnrich
+          .filter(c => !c.display_name || c.display_name.trim() === '' || !c.avatar_url)
+          .map(c => c.user_id)
+          .filter(id => !!id)
+      ));
+
+      // 2. Récupérer tous les profils en une seule fois
+      let profilesMap: { [key: string]: any } = {};
+      if (userIdsToFetch.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, display_name, username, avatar_url')
+          .in('id', userIdsToFetch);
+
+        profiles?.forEach(p => {
+          profilesMap[p.id] = p;
+        });
+      }
+
+      // 3. Mapper les commentaires avec les données de profil
+      const enrichedComments = commentsToEnrich.map(comment => {
+        const profile = comment.user_id ? profilesMap[comment.user_id] : null;
+        return {
+          ...comment,
+          display_name: profile?.display_name || profile?.username || comment.display_name || comment.username || 'Utilisateur',
+          avatar_url: profile?.avatar_url || comment.avatar_url || null
+        };
+      });
+
+      setComments(enrichedComments);
+      console.log('✅ Commentaires chargés et enrichis:', enrichedComments.length);
     } catch (err: any) {
       console.error('❌ Erreur:', err.message);
     } finally {
