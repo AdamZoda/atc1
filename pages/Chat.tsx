@@ -706,18 +706,18 @@ const Chat: React.FC = () => {
     );
 
     return (
-        <div className="h-screen pt-24 pb-8 px-4 md:px-8 bg-luxury-dark overflow-hidden">
+        <div className="h-screen pt-28 pb-2 md:pt-24 md:pb-8 px-2 md:px-8 bg-luxury-dark overflow-hidden">
             <div className="max-w-7xl mx-auto h-full flex glass rounded-[2rem] overflow-hidden border border-white/5 shadow-2xl relative">
 
                 {/* Sidebar */}
                 <div className={`
           ${isMobileSidebarOpen ? 'flex' : 'hidden'} md:flex
-          flex-col w-full md:w-80 lg:w-96 border-r border-white/5 bg-black/20 backdrop-blur-md
-          absolute md:relative inset-0 z-30 md:z-auto
+          flex-col w-full md:w-80 lg:w-96 border-r border-white/5 bg-luxury-dark md:bg-black/20 backdrop-blur-md
+          absolute md:relative inset-0 z-[40] md:z-auto
         `}>
-                    <div className="p-6 border-b border-white/5">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-2xl font-cinzel font-black text-white">Discussions</h2>
+                    <div className="p-4 md:p-6 border-b border-white/5">
+                        <div className="flex items-center justify-between mb-4 md:mb-6">
+                            <h2 className="text-xl md:text-2xl font-cinzel font-black text-white">Discussions</h2>
                             <div className="flex items-center gap-3 relative">
                                 <button
                                     onClick={() => setIsIdModalOpen(true)}
@@ -807,7 +807,7 @@ const Chat: React.FC = () => {
                                     setIsMobileSidebarOpen(false);
                                 }}
                                 className={`
-                  w-full p-4 flex items-center gap-4 transition-all border-b border-white/5
+                  w-full p-3 md:p-4 flex items-center gap-3 md:gap-4 transition-all border-b border-white/5
                   ${activeRoom?.id === room.id ? 'bg-luxury-gold/10' : 'hover:bg-white/5'}
                 `}
                             >
@@ -815,18 +815,18 @@ const Chat: React.FC = () => {
                                     {room.type === 'general' ? (
                                         <img
                                             src="https://i.postimg.cc/L4wgGYg6/ATC.png"
-                                            className="w-14 h-14 rounded-2xl object-cover border border-luxury-gold/30 shadow-lg shadow-luxury-gold/5"
+                                            className="w-12 h-12 md:w-14 md:h-14 rounded-2xl object-cover border border-luxury-gold/30 shadow-lg shadow-luxury-gold/5"
                                             alt="ATC"
                                         />
                                     ) : room.type === 'group' ? (
-                                        <div className="w-14 h-14 rounded-2xl bg-blue-500/20 flex items-center justify-center text-blue-400 border border-blue-500/30">
+                                        <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-blue-500/20 flex items-center justify-center text-blue-400 border border-blue-500/30">
                                             <MessageSquare size={24} />
                                         </div>
                                     ) : (
                                         <img
                                             src={room.participant_avatar || 'https://i.postimg.cc/L4wgGYg6/ATC.png'}
                                             alt={room.participant_name}
-                                            className="w-14 h-14 rounded-2xl object-cover border border-white/10"
+                                            className="w-12 h-12 md:w-14 md:h-14 rounded-2xl object-cover border border-white/10"
                                         />
                                     )}
                                     {(room.id === GENERAL_ROOM_ID || (room as any).is_public) && (
@@ -835,7 +835,7 @@ const Chat: React.FC = () => {
                                 </div>
                                 <div className="flex-grow text-left">
                                     <div className="flex items-center justify-between mb-1">
-                                        <span className="font-bold text-white truncate max-w-[150px]">
+                                        <span className="font-bold text-white truncate max-w-[120px] md:max-w-[150px] text-sm md:text-base">
                                             {room.type === 'general' ? 'Chat Général' : (room.type === 'private' ? room.participant_name : room.name)}
                                         </span>
                                         <span className="text-[10px] text-gray-500 uppercase tracking-widest">
@@ -852,11 +852,11 @@ const Chat: React.FC = () => {
                 </div>
 
                 {/* Chat Area */}
-                <div className="flex-grow flex flex-col min-w-0 bg-black/10">
+                <div className={`flex-grow flex flex-col min-w-0 bg-black/10 ${isMobileSidebarOpen ? 'hidden md:flex' : 'flex'}`}>
                     {activeRoom ? (
                         <>
                             {/* Chat Header */}
-                            <div className="p-4 md:p-6 border-b border-white/5 flex items-center justify-between backdrop-blur-sm z-20">
+                            <div className="p-3 md:p-6 border-b border-white/5 flex items-center justify-between backdrop-blur-sm z-20">
                                 <div className="flex items-center gap-4">
                                     <button
                                         onClick={() => setIsMobileSidebarOpen(true)}
@@ -1002,7 +1002,7 @@ const Chat: React.FC = () => {
                                                                 ) : <div className="w-8" />}
                                                             </div>
                                                         )}
-                                                        <div className={`max-w-[75%] md:max-w-[60%] ${isOwn ? 'order-1' : 'order-2'}`}>
+                                                        <div className={`max-w-[85%] md:max-w-[70%] ${isOwn ? 'order-1' : 'order-2'}`}>
                                                             {showAvatar && !isOwn && (
                                                                 <span className="text-[10px] text-luxury-gold font-bold uppercase tracking-widest ml-1 mb-1 block">
                                                                     {msg.profiles?.display_name || msg.profiles?.username}
@@ -1038,7 +1038,7 @@ const Chat: React.FC = () => {
                                     </div>
 
                                     {/* Input Area */}
-                                    <div className="p-4 md:p-6 border-t border-white/5 backdrop-blur-sm">
+                                    <div className="p-3 md:p-6 border-t border-white/5 backdrop-blur-sm">
                                         {activeRoom.is_locked && currentUser?.role !== 'admin' ? (
                                             <div className="glass p-4 rounded-xl flex items-center justify-center gap-3 text-red-400">
                                                 <Lock size={20} />
@@ -1060,7 +1060,7 @@ const Chat: React.FC = () => {
                                                         placeholder="Écrivez votre message..."
                                                         value={newMessage}
                                                         onChange={(e) => setNewMessage(e.target.value)}
-                                                        className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-6 text-white placeholder:text-gray-500 focus:outline-none focus:border-luxury-gold/50 transition-all font-light"
+                                                        className="w-full bg-white/5 border border-white/10 rounded-xl py-2 md:py-3 px-4 md:px-6 text-white placeholder:text-gray-500 focus:outline-none focus:border-luxury-gold/50 transition-all font-light text-sm md:text-base"
                                                     />
                                                 </div>
                                                 <button
