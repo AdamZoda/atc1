@@ -764,8 +764,6 @@ const Admin: React.FC = () => {
   const updatePageVisibility = async (pageId: string, isVisible: boolean) => {
     try {
       setPageVisibilityLoading(true);
-      console.log('🔄 DÉBUT UPDATE - pageId:', pageId, 'isVisible:', isVisible);
-      console.log('📤 Envoi de la requête Supabase UPDATE...');
 
       // 1. On récupère tout pour être sûr de trouver le bon enregistrement (il y en a peu)
       const { data: records } = await supabase
@@ -778,18 +776,15 @@ const Admin: React.FC = () => {
         r.id === `page-${pageId.toLowerCase()}`
       );
 
-      console.log('🔍 Résultat de la recherche locale:', existing);
 
       let finalError;
       if (existing) {
-        console.log('📝 Mise à jour de la ligne ID:', existing.id);
         const { error: updateError } = await supabase
           .from('page_visibility')
           .update({ is_visible: isVisible, page_name: pageId })
           .eq('id', existing.id);
         finalError = updateError;
       } else {
-        console.log('➕ Insertion nouvelle ligne pour:', pageId);
         const { error: insertError } = await supabase
           .from('page_visibility')
           .insert({
@@ -802,17 +797,14 @@ const Admin: React.FC = () => {
 
       const error = finalError;
 
-      console.log('✅ RÉPONSE SUPABASE - error:', error);
 
       if (error) {
         console.error('🔴 ERREUR DÉTECTÉE:', error.message, error.code, error.details);
         throw error;
       }
 
-      console.log('✨ Mise à jour UI locale...');
       await fetchPageVisibilities();
 
-      console.log('✅ SUCCESS COMPLET');
 
       // Log l'action
       const pageNames: { [key: string]: string } = {

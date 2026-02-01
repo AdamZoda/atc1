@@ -244,7 +244,6 @@ const Chat: React.FC = () => {
                 return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
             });
 
-            console.log('✅ Final Rooms List:', sorted);
             setRooms(sorted);
 
             if (!activeRoom && sorted.length > 0) {

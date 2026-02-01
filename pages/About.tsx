@@ -125,7 +125,7 @@ const About: React.FC = () => {
       });
 
       setComments(enrichedComments);
-      console.log('✅ Commentaires chargés et enrichis:', enrichedComments.length);
+      // console.log('✅ Commentaires chargés et enrichis:', enrichedComments.length);
     } catch (err: any) {
       console.error('❌ Erreur:', err.message);
     } finally {
@@ -145,7 +145,6 @@ const About: React.FC = () => {
         console.error('❌ Erreur chargement équipe admin:', error);
       } else {
         setAdminTeam(data || []);
-        console.log('✅ Équipe admin chargée:', data?.length);
       }
     } catch (err: any) {
       console.error('❌ Erreur:', err.message);
@@ -158,12 +157,10 @@ const About: React.FC = () => {
     e.preventDefault();
 
     if (!session) {
-      console.log('Vous devez être connecté pour commenter');
       return;
     }
 
     if (!commentMessage.trim()) {
-      console.log('Veuillez écrire un message');
       return;
     }
 
@@ -183,16 +180,14 @@ const About: React.FC = () => {
 
       if (error) {
         console.error('❌ Erreur envoi commentaire:', error);
-        console.log(`Erreur: ${error.message}`);
+        // console.log(`Erreur: ${error.message}`);
       } else {
-        console.log('✅ Commentaire publié instantanément');
 
         // Ajouter le commentaire en direct au state (live update)
         if (data && data[0]) {
           setComments([data[0], ...comments]);
         }
 
-        console.log('✅ Commentaire publié!');
         setCommentMessage('');
       }
     } catch (err: any) {
@@ -207,12 +202,10 @@ const About: React.FC = () => {
     e.preventDefault();
 
     if (!session) {
-      console.log('Vous devez être connecté pour ouvrir un ticket');
       return;
     }
 
     if (!ticketDescription.trim()) {
-      console.log('Veuillez décrire votre problème');
       return;
     }
 
@@ -232,10 +225,8 @@ const About: React.FC = () => {
 
       if (error) {
         console.error('❌ Erreur création ticket:', error);
-        console.log(`Erreur: ${error.message}`);
+        // console.log(`Erreur: ${error.message}`);
       } else {
-        console.log('✅ Ticket créé');
-        console.log('✅ Ticket créé avec succès!');
         setTicketDescription('');
         setShowTicketForm(false);
       }
@@ -296,7 +287,6 @@ const About: React.FC = () => {
         .single();
 
       if (ticketError || !ticket?.allow_user_replies) {
-        console.log('❌ L\'admin a désactivé les réponses sur ce ticket');
         setUserTicketReplying(false);
         return;
       }
@@ -320,7 +310,7 @@ const About: React.FC = () => {
 
       setUserTicketReply('');
     } catch (error: any) {
-      console.log(`Erreur: ${error.message}`);
+      // console.log(`Erreur: ${error.message}`);
     } finally {
       setUserTicketReplying(false);
     }

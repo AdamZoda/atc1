@@ -151,7 +151,6 @@ const AppContent = () => {
       if (discordId && discordId !== data.provider_id) updates.provider_id = discordId;
 
       if (Object.keys(updates).length > 0) {
-        console.log('🔄 Sync Discord en temps réel:', updates);
         await supabase
           .from('profiles')
           .update(updates)
