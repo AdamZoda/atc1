@@ -331,7 +331,7 @@ const ProfilePage: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                <p className="text-sm text-gray-300"> Vérifiez votre localisation  </p>
+                <p className="text-sm text-gray-300"> Vérifiez votrecompte   </p>
                 <button
                   onClick={handleRequestLocation}
                   disabled={requestingLocation}
@@ -369,7 +369,7 @@ const ProfilePage: React.FC = () => {
                   <ul className="space-y-2 text-xs text-gray-300">
                     <li><strong>Chrome/Edge:</strong> Cliquez sur le 🔒 • Géolocalisation • Toujours autoriser</li>
                     <li><strong>Firefox:</strong> Cliquez sur le 🔒 • Permissions • Géolocalisation ✓</li>
-                    <li><strong>Safari:</strong> Préférences • Confidentialité • Localisation • Autoriser</li>
+                    <li><strong>Safari:</strong> Préférences • Confidentialité •compte  • Autoriser</li>
                   </ul>
                 </div>
                 <button

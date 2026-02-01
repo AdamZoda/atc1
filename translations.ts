@@ -17,7 +17,7 @@ export const translations = {
     },
     // Home page
     home: {
-      title: 'LIVE THE ROLLPLAY',
+      title: 'LIVE THE MASTER ROLLPLAY',
       subtitle: 'The Excellence of Roleplay',
       description: 'Discover Atlantic RP, the FiveM server where luxury meets total immersion. Exclusive systems, realistic economy and prestigious community.',
       joinNow: 'Join Now',

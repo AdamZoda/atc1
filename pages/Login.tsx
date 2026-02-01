@@ -68,7 +68,7 @@ const Login: React.FC = () => {
           aria-label="Discord"
           className="w-full py-5 bg-[#5865F2] text-white font-black uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 hover:brightness-105 disabled:opacity-50 transition-all text-lg"
         >
-          {loading ? 'Chargement...' : '🔗 Se connecter avec Discord'}
+          {loading ? 'Chargement...' : '🔗  Discord'}
         </button>
 
         <div className="mt-10 text-center">
