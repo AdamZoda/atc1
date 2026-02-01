@@ -133,6 +133,14 @@ const Home: React.FC = () => {
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.4 }}
               className="font-cinzel text-5xl md:text-7xl lg:text-8xl font-black mb-6 tracking-tight leading-tight"
+              style={{
+                background: 'linear-gradient(135deg, #D4AF37 0%, #F9E4B7 50%, #D4AF37 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                textShadow: '0 0 40px rgba(212, 175, 55, 0.5), 0 0 80px rgba(212, 175, 55, 0.3)',
+                filter: 'drop-shadow(0 4px 20px rgba(212, 175, 55, 0.4))'
+              }}
             >
               {t('home.title')}
             </motion.h1>

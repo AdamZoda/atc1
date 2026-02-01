@@ -31,7 +31,7 @@ const Scene3D = () => {
         <div className="w-full h-full min-h-[400px] lg:min-h-[600px] relative z-10 cursor-move">
             <Canvas
                 shadows={false} // Disable active shadows to gain performance
-                dpr={[1, 1.5]} // Limit pixel ratio for high DPI screens
+                dpr={[0.8, 1.2]} // Reduced pixel ratio for better performance
                 camera={{ position: [0, 2, 8], fov: 45 }}
                 className="w-full h-full"
                 gl={{
@@ -42,8 +42,10 @@ const Scene3D = () => {
                 }}
                 performance={{ min: 0.5 }} // Allow the scene to scale down on heavy load
             >
-                <ambientLight intensity={0.7} />
-                <pointLight position={[10, 10, 10]} intensity={1} />
+                <ambientLight intensity={1.0} />
+                <directionalLight position={[5, 5, 5]} intensity={1.5} />
+                <pointLight position={[10, 10, 10]} intensity={1.2} />
+                <pointLight position={[-10, -10, -10]} intensity={0.5} />
 
                 <Suspense fallback={null}>
                     <Float
@@ -54,7 +56,6 @@ const Scene3D = () => {
                     >
                         <Model />
                     </Float>
-                    <Environment preset="city" />
                     <ContactShadows
                         position={[0, -1.5, 0]}
                         opacity={0.3}
@@ -64,7 +65,6 @@ const Scene3D = () => {
                         frames={1} // Only render shadows once
                     />
                     <AdaptiveDpr pixelated />
-                    <Preload all />
                 </Suspense>
 
                 <OrbitControls

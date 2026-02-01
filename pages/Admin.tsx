@@ -2491,6 +2491,7 @@ const Admin: React.FC = () => {
                   'Gallery': '🎨 Galerie',
                   'About': 'ℹ️ À propos',
                   'Chat': '💬 Chat',
+                  'Blog': '📝 Blog',
                 }).map(([pageId, label]) => (
                   <div
                     key={pageId}

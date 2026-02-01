@@ -31,6 +31,7 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
       { label: 'À propos', path: '/about', visible: isPageVisible('About') },
       { label: t('nav.community'), path: '/community', visible: isPageVisible('Community') },
       { label: 'Chat', path: '/chat', visible: !!profile && isPageVisible('Chat') },
+      { label: 'Blog', path: '/blog', visible: isPageVisible('Blog') },
       { label: 'Shop', path: '/shop', visible: isPageVisible('Shop') },
       { label: t('nav.media'), path: '/media', restricted: true, visible: isPageVisible('Gallery') },
     ];
@@ -76,7 +77,7 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
       <div className="max-w-7xl mx-auto glass rounded-2xl flex items-center justify-between px-4 md:px-6 py-4">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 md:gap-3 flex-shrink-0">
-          <img src="https://i.postimg.cc/L4wgGYg6/ATC.png" alt="Atlantic RP" className="h-10 md:h-12 w-auto" />
+          <img src="https://i.postimg.cc/L4wgGYg6/ATC.png" alt="Atlantic RP" className="h-10 md:h-12 w-auto" width="48" height="48" />
           <span className="hidden md:block font-cinzel text-sm md:text-xl font-bold tracking-widest bg-gradient-to-r from-luxury-gold to-white bg-clip-text text-transparent">
             ATLANTIC RP
           </span>

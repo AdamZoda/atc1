@@ -23,6 +23,7 @@ import Login from './pages/Login';
 import AuthCallback from './pages/AuthCallback';
 import ProfilePage from './pages/Profile';
 import Chat from './pages/Chat';
+import Blog from './pages/Blog';
 
 // Components
 import Navbar from './components/Navbar';
@@ -245,6 +246,7 @@ const AppContent = () => {
               <Route path="/about" element={<About />} />
               <Route path="/community" element={<Community />} />
               <Route path="/shop" element={<Shop />} />
+              <Route path="/blog" element={<Blog />} />
 
               {/* Protected Routes */}
               <Route

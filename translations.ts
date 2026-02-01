@@ -19,7 +19,7 @@ export const translations = {
     home: {
       title: 'LIVE THE MASTER ROLLPLAY',
       subtitle: 'The Excellence of Roleplay',
-      description: 'Discover Atlantic RP, the FiveM server where luxury meets total immersion. Exclusive systems, realistic economy and prestigious community.',
+      description: 'Discover Atlantic RP, the best GTA RP FiveM server in Morocco where luxury meets total immersion. Exclusive systems, realistic economy and prestigious community.',
       joinNow: 'Join Now',
       discoverMore: 'Discover More',
     },
@@ -110,7 +110,7 @@ export const translations = {
     },
     // Footer
     footer: {
-      rights: 'All rights reserved. Design by FiveM Experts.',
+      rights: 'Atlantic RP - Le serveur GTA RP / FiveM #1 au Maroc. Tous droits réservés. Design by FiveM Experts.',
       contact: 'Contact',
       discord: 'Join Our Official Discord',
       support: 'Support',
@@ -167,7 +167,7 @@ export const translations = {
     home: {
       title: 'VIVEZ L\'ABONDANCE',
       subtitle: 'L\'Excellence du Roleplay',
-      description: 'Découvrez Atlantic RP, le serveur FiveM où le luxe rencontre l\'immersion totale. Systèmes exclusifs, économie réaliste et communauté prestigieuse.',
+      description: 'Découvrez Atlantic RP, le meilleur serveur GTA RP FiveM au Maroc où le luxe rencontre l\'immersion totale. Systèmes exclusifs, économie réaliste et communauté prestigieuse.',
       joinNow: 'Rejoindre',
       discoverMore: 'En savoir plus',
     },
@@ -258,7 +258,7 @@ export const translations = {
     },
     // Footer
     footer: {
-      rights: 'Tous droits réservés. Design by FiveM Experts.',
+      rights: 'Atlantic RP - Le serveur GTA RP / FiveM #1 au Maroc. Tous droits réservés. Design by FiveM Experts.',
       contact: 'Contact',
       discord: 'Rejoindre Notre DISCORD',
       support: 'Support',
