@@ -107,7 +107,8 @@ const UserSidePanel: React.FC<{
   onRemoveAdmin: (user: Profile) => void;
   onUpdateNotes: (userId: string, notes: string) => void;
   onSync?: () => void;
-}> = ({ user, isOpen, onClose, onBan, onUnban, onWarn, onDelete, onPromote, onRemoveAdmin, onUpdateNotes, onSync }) => {
+  onMessage?: (user: Profile) => void;
+}> = ({ user, isOpen, onClose, onBan, onUnban, onWarn, onDelete, onPromote, onRemoveAdmin, onUpdateNotes, onSync, onMessage }) => {
   const [localNotes, setLocalNotes] = React.useState('');
   const [activeSubTab, setActiveSubTab] = React.useState<'overview' | 'json'>('overview');
   const [rawAuthData, setRawAuthData] = React.useState<any>(null);
@@ -309,7 +310,10 @@ const UserSidePanel: React.FC<{
                   </div>
 
                   <div className="flex gap-3">
-                    <button className="flex-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 py-3 rounded-xl font-bold uppercase text-[10px] transition-all flex items-center justify-center gap-2 border border-blue-500/10">
+                    <button
+                      onClick={() => onMessage && onMessage(user)}
+                      className="flex-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 py-3 rounded-xl font-bold uppercase text-[10px] transition-all flex items-center justify-center gap-2 border border-blue-500/10"
+                    >
                       <Send size={16} /> Message
                     </button>
                     {hasGPS && (
@@ -671,10 +675,13 @@ const Admin: React.FC = () => {
 
   const fetchUsers = async () => {
     try {
+      setLoading(true);
       // Récupérer les profils avec TOUS les champs incluant provider_id
+      // On trie par created_at pour voir les nouveaux en premier si possible
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('*');
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Erreur chargement profils:', error);
@@ -683,11 +690,7 @@ const Admin: React.FC = () => {
       }
 
       if (profiles) {
-        // Debug: afficher les données récupérées
-        console.log('📥 Profils chargés:', profiles);
-        profiles.forEach((p: any) => {
-          console.log(`  👤 ${p.username}: provider_id = ${p.provider_id || 'NULL'}`);
-        });
+        console.log(`📥 ${profiles.length} profils chargés.`);
         setUsers(profiles);
       }
       setLoading(false);
@@ -2164,16 +2167,25 @@ const Admin: React.FC = () => {
                       </div>
                       <div>
                         <h2 className="text-xl font-bold text-white tracking-tight">Gestion des Utilisateurs</h2>
-                        <p className="text-sm text-gray-400">{filteredUsers.length} utilisateurs trouvés</p>
+                        <p className="text-sm text-gray-400">
+                          {filteredUsers.length} utilisateurs affichés / {users.length} au total
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      <button
+                        onClick={fetchUsers}
+                        className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-xl border border-white/10 text-xs font-black uppercase transition-all"
+                      >
+                        <RefreshCcw size={14} className={loading ? 'animate-spin' : ''} />
+                        Actualiser
+                      </button>
                       <button
                         onClick={handleGlobalSync}
                         className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 rounded-xl border border-indigo-500/20 text-xs font-black uppercase transition-all"
                         title="Synchroniser avatars & IDs Discord pour tous les users"
                       >
-                        <RefreshCcw size={14} className={loading ? 'animate-spin' : ''} />
+                        <ShieldCheck size={14} className={loading ? 'animate-spin' : ''} />
                         Sync Global
                       </button>
                       <button
@@ -2234,6 +2246,74 @@ const Admin: React.FC = () => {
               }}
               onUpdateNotes={updateAdminNotes}
               onSync={fetchUsers}
+              onMessage={async (targetUser) => {
+                try {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  if (!session) return navigate('/login');
+
+                  const currentUserId = session.user.id;
+                  if (currentUserId === targetUser.id) return alert("Vous ne pouvez pas vous envoyer de message à vous-même.");
+
+                  // 1. Chercher si une room privée existe déjà
+                  const { data: myParticipants } = await supabase
+                    .from('chat_participants')
+                    .select('room_id')
+                    .eq('user_id', currentUserId);
+
+                  const myRoomIds = myParticipants?.map(p => p.room_id) || [];
+                  let existingRoomId = null;
+
+                  if (myRoomIds.length > 0) {
+                    const { data: sharedParticipants } = await supabase
+                      .from('chat_participants')
+                      .select('room_id')
+                      .in('room_id', myRoomIds)
+                      .eq('user_id', targetUser.id);
+
+                    if (sharedParticipants && sharedParticipants.length > 0) {
+                      const { data: existingRooms } = await supabase
+                        .from('chat_rooms')
+                        .select('id')
+                        .eq('type', 'private')
+                        .in('id', sharedParticipants.map(sp => sp.room_id));
+
+                      if (existingRooms && existingRooms.length > 0) {
+                        existingRoomId = existingRooms[0].id;
+                      }
+                    }
+                  }
+
+                  let finalRoomId = existingRoomId;
+
+                  // 2. Si pas de room, la créer
+                  if (!finalRoomId) {
+                    const { data: newRoom, error: roomError } = await supabase
+                      .from('chat_rooms')
+                      .insert({
+                        type: 'private',
+                        name: `Support: ${targetUser.username}`
+                      })
+                      .select()
+                      .single();
+
+                    if (roomError) throw roomError;
+
+                    const { error: partError } = await supabase.from('chat_participants').insert([
+                      { room_id: newRoom.id, user_id: currentUserId },
+                      { room_id: newRoom.id, user_id: targetUser.id }
+                    ]);
+
+                    if (partError) throw partError;
+                    finalRoomId = newRoom.id;
+                  }
+
+                  // 3. Rediriger vers le chat avec l'ID de la room
+                  navigate('/chat', { state: { openRoomId: finalRoomId } });
+                } catch (err: any) {
+                  console.error('Error starting message:', err);
+                  alert('Erreur lors de l\'ouverture de la discussion');
+                }
+              }}
             />
           </div>
         )}
@@ -2571,31 +2651,6 @@ const Admin: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Server Info */}
-                <div className="p-5 rounded-lg bg-black/50 border border-white/10">
-                  <h4 className="font-bold uppercase tracking-widest text-xs mb-3">Informations du Serveur</h4>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-1">Uptime du Serveur</label>
-                      <input type="text" placeholder="Ex: 99.9%" className="w-full px-3 py-2 rounded-lg bg-black border border-white/10 focus:border-luxury-gold text-white outline-none text-xs" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-1">Latence</label>
-                      <input type="text" placeholder="Ex: ⚡ Faible Latence" className="w-full px-3 py-2 rounded-lg bg-black border border-white/10 focus:border-luxury-gold text-white outline-none text-xs" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-1">Taille Communauté</label>
-                      <input type="text" placeholder="Ex: 5000+ Joueurs" className="w-full px-3 py-2 rounded-lg bg-black border border-white/10 focus:border-luxury-gold text-white outline-none text-xs" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Discord Link */}
-                <div className="p-5 rounded-lg bg-black/50 border border-white/10">
-                  <h4 className="font-bold uppercase tracking-widest text-xs mb-3">Lien Discord</h4>
-                  <input type="url" placeholder="https://discord.gg/..." className="w-full px-3 py-2 rounded-lg bg-black border border-white/10 focus:border-luxury-gold text-white outline-none text-xs" />
-                </div>
-
                 {/* Admin Team Management */}
                 <div className="p-5 rounded-lg bg-black/50 border border-white/10 lg:col-span-2">
                   <h4 className="font-bold uppercase tracking-widest text-xs mb-3">👥 Gestion de la Pyramide d'Administration</h4>

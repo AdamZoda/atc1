@@ -49,8 +49,8 @@ const AuthCallback: React.FC = () => {
       console.log('🆔 Extracted Discord ID:', providerId);
       console.log('🖼️ Extracted Discord Avatar:', discordAvatar);
 
-      // Fetch existing profile to avoid overwriting user edits
-      const { data: existingProfile, error: fetchError } = await supabase.from('profiles').select('username, avatar_url, display_name, provider_id').eq('id', user.id).maybeSingle();
+      // Fetch existing profile to avoid overwriting user edits and preserve role
+      const { data: existingProfile, error: fetchError } = await supabase.from('profiles').select('role, username, avatar_url, display_name, provider_id').eq('id', user.id).maybeSingle();
 
       if (fetchError) {
         console.error('❌ Erreur fetch profil:', fetchError);
@@ -63,13 +63,15 @@ const AuthCallback: React.FC = () => {
       const finalDisplayName = existingProfile?.display_name || identityDisplayName;
       const finalAvatar = existingProfile?.avatar_url || discordAvatar || null;
       const finalProviderId = existingProfile?.provider_id || providerId;
+      const finalRole = existingProfile?.role || 'user'; // Default to 'user' for new accounts
 
       console.log('💾 Données à upsert:', {
         id: user.id,
         username: finalUsername,
         display_name: finalDisplayName,
         avatar_url: finalAvatar,
-        provider_id: finalProviderId
+        provider_id: finalProviderId,
+        role: finalRole
       });
 
       const { data: upsertData, error: upsertError } = await supabase.from('profiles').upsert({
@@ -78,8 +80,9 @@ const AuthCallback: React.FC = () => {
         avatar_url: finalAvatar,
         display_name: finalDisplayName,
         provider_id: finalProviderId,
+        role: finalRole,
         updated_at: new Date().toISOString()
-      });
+      }, { onConflict: 'id' });
 
       if (upsertError) {
         console.error('❌ Erreur upsert profil:', upsertError);
