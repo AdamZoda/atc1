@@ -104,15 +104,15 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
           ))}
         </div>
 
-        {/* Auth Actions */}
-        <div className="hidden md:flex items-center gap-2 md:gap-4 flex-shrink-0">
+        {/* Auth Actions - Desktop Only (re-enabled for SM to show minimal info) */}
+        <div className="hidden sm:flex items-center gap-2 md:gap-4 flex-shrink-0">
           {profile ? (
             <div className="flex items-center gap-2 md:gap-4">
-              <Link to="/profile" className="flex items-center gap-2 md:gap-3">
+              <Link to="/profile" className="flex items-center gap-2 md:gap-3 shrink-0">
                 <img
                   src={profile.avatar_url || DEFAULT_AVATAR}
                   alt="avatar"
-                  className="w-8 md:w-10 h-8 md:h-10 rounded-full object-cover border border-white/10 flex-shrink-0"
+                  className="w-8 md:w-10 h-8 md:h-10 rounded-full object-cover border border-white/10"
                   referrerPolicy="no-referrer"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
@@ -122,13 +122,13 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
                 />
               </Link>
 
-              <div className="hidden sm:flex flex-col items-end">
+              <div className="hidden lg:flex flex-col items-end">
                 {(() => {
                   const nameFromProfile = profile?.display_name || profile?.username || '';
                   const isEmail = nameFromProfile.includes && nameFromProfile.includes('@');
                   const display = !isEmail && nameFromProfile ? nameFromProfile : (fallbackName || nameFromProfile || profile?.id);
                   return (
-                    <Link to="/profile" className="text-xs md:text-sm font-semibold text-white hover:underline truncate">
+                    <Link to="/profile" className="text-xs md:text-sm font-semibold text-white hover:underline truncate max-w-[100px]">
                       {display}
                     </Link>
                   );
@@ -137,7 +137,7 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
               </div>
               <button
                 onClick={handleLogout}
-                className="px-3 md:px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-xs md:text-sm font-medium whitespace-nowrap flex-shrink-0"
+                className="hidden md:block px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-sm font-medium whitespace-nowrap"
               >
                 {t('nav.logout')}
               </button>
@@ -145,17 +145,17 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
           ) : (
             <Link
               to="/login"
-              className="flex items-center gap-2 px-4 md:px-6 py-2 rounded-lg bg-luxury-gold hover:bg-luxury-goldLight transition-all text-black text-xs md:text-sm font-bold button-glow flex-shrink-0"
+              className="flex items-center gap-2 px-3 sm:px-4 md:px-6 py-2 rounded-lg bg-luxury-gold hover:bg-luxury-goldLight transition-all text-black text-[10px] md:text-sm font-bold button-glow"
             >
-              <LogIn size={16} className="flex-shrink-0" />
-              <span className="hidden sm:inline">{t('nav.login')}</span>
+              <LogIn size={14} className="flex-shrink-0 md:size-4" />
+              <span>{t('nav.login')}</span>
             </Link>
           )}
         </div>
 
         {/* Mobile Menu Toggle */}
-        <button className="lg:hidden text-white" onClick={() => setIsOpen(!isOpen)}>
-          {isOpen ? <X /> : <Menu />}
+        <button className="lg:hidden p-2 -mr-2 text-white hover:text-luxury-gold transition-colors" onClick={() => setIsOpen(!isOpen)}>
+          {isOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
       </div>
 
@@ -168,30 +168,64 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
             exit={{ opacity: 0, y: -20 }}
             className="lg:hidden absolute top-24 left-4 right-4 glass rounded-2xl overflow-hidden shadow-2xl"
           >
-            <div className="flex flex-col p-4 gap-4">
+            <div className="flex flex-col p-5 gap-3">
               {getNavLinks().map((link) => (
                 link.visible === true && (
                   <Link
                     key={link.path}
                     to={link.path}
                     onClick={() => setIsOpen(false)}
-                    className="px-4 py-3 rounded-lg hover:bg-white/5 transition-all flex items-center justify-between"
+                    className={`px-4 py-3 rounded-xl transition-all flex items-center justify-between ${location.pathname === link.path ? 'bg-luxury-gold/20' : 'hover:bg-white/5'
+                      }`}
                   >
-                    <span className={location.pathname === link.path ? 'text-luxury-gold font-bold' : 'text-gray-300'}>
+                    <span className={`text-sm tracking-wider ${location.pathname === link.path ? 'text-luxury-gold font-bold' : 'text-gray-300'}`}>
                       {link.label}
                     </span>
+                    {location.pathname === link.path && <div className="w-1.5 h-1.5 rounded-full bg-luxury-gold" />}
                   </Link>
                 )
               ))}
-              {!profile && (
-                <Link
-                  to="/login"
-                  onClick={() => setIsOpen(false)}
-                  className="mt-4 w-full py-3 text-center bg-luxury-gold text-black font-bold rounded-xl"
-                >
-                  CONNEXION
-                </Link>
-              )}
+
+              <div className="mt-4 pt-4 border-t border-white/5 flex flex-col gap-3">
+                {profile ? (
+                  <>
+                    <Link
+                      to="/profile"
+                      onClick={() => setIsOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 transition-all"
+                    >
+                      <img
+                        src={profile.avatar_url || DEFAULT_AVATAR}
+                        alt="avatar"
+                        className="w-8 h-8 rounded-full border border-white/10"
+                      />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-white leading-none mb-1">
+                          {profile.display_name || profile.username}
+                        </span>
+                        <span className="text-[10px] uppercase text-luxury-gold">{profile.role}</span>
+                      </div>
+                    </Link>
+                    <button
+                      onClick={() => {
+                        handleLogout();
+                        setIsOpen(false);
+                      }}
+                      className="w-full py-4 rounded-xl bg-white/5 border border-white/10 text-red-400 font-bold text-xs uppercase tracking-widest hover:bg-red-500/10 transition-all"
+                    >
+                      DÉCONNEXION
+                    </button>
+                  </>
+                ) : (
+                  <Link
+                    to="/login"
+                    onClick={() => setIsOpen(false)}
+                    className="w-full py-4 text-center bg-luxury-gold text-black font-black rounded-xl text-xs uppercase tracking-[0.2em] button-glow"
+                  >
+                    {t('nav.login')}
+                  </Link>
+                )}
+              </div>
             </div>
           </motion.div>
         )}
