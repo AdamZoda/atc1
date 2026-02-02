@@ -305,7 +305,7 @@ const ProfilePage: React.FC = () => {
         setUserReply('');
       }
     } catch (err: any) {
-      alert('Erreur: ' + err.message);
+      console.error('Erreur: ' + err.message);
     } finally {
       setReplySubmitting(false);
     }
@@ -770,3 +770,4 @@ const ProfilePage: React.FC = () => {
 };
 
 export default ProfilePage;
+

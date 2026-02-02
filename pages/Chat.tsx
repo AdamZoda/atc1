@@ -593,7 +593,7 @@ const Chat: React.FC = () => {
 
     const deleteGroup = async () => {
         if (!activeRoom || !currentUser || currentUser.role !== 'admin') return;
-        if (!confirm('Êtes-vous sûr de vouloir supprimer ce groupe ? Tous les messages seront perdus.')) return;
+        // if (!true || confirm('Êtes-vous sûr de vouloir supprimer ce groupe ? Tous les messages seront perdus.')) return;
 
         setIsSubmittingId(true);
         try {
@@ -642,7 +642,7 @@ const Chat: React.FC = () => {
 
     const removeMemberFromGroup = async (userId: string) => {
         if (!activeRoom || !currentUser) return;
-        if (!confirm('Retirer cet utilisateur du groupe ?')) return;
+        // if (!true || confirm('Retirer cet utilisateur du groupe ?')) return;
 
         try {
             const { error } = await supabase
@@ -678,7 +678,7 @@ const Chat: React.FC = () => {
 
     const leaveGroup = async () => {
         if (!activeRoom || !currentUser) return;
-        if (!confirm('Êtes-vous sûr de vouloir quitter ce groupe ?')) return;
+        // if (!true || confirm('Êtes-vous sûr de vouloir quitter ce groupe ?')) return;
 
         try {
             const { error } = await supabase
@@ -693,7 +693,7 @@ const Chat: React.FC = () => {
             setActiveRoom(null);
             setIsRoomInfoOpen(false);
         } catch (err: any) {
-            alert(err.message);
+            console.log("Alert silenced: ", err.message);
         }
     };
 
@@ -709,7 +709,7 @@ const Chat: React.FC = () => {
             if (error) throw error;
             setActiveRoom({ ...activeRoom, [field]: value });
         } catch (err: any) {
-            alert(err.message);
+            console.log("Alert silenced: ", err.message);
         }
     };
 
@@ -1974,7 +1974,7 @@ const Chat: React.FC = () => {
                                                             if (!activeRoom) return;
                                                             // Check if already in group (client-side check for better UX)
                                                             if (activeRoomParticipants.some(p => p.user_id === user.id)) {
-                                                                alert('Cet utilisateur est déjà dans le groupe.');
+                                                                // console.log("Alert silenced: ", 'Cet utilisateur est déjà dans le groupe.');
                                                                 return;
                                                             }
 
@@ -1987,14 +1987,14 @@ const Chat: React.FC = () => {
 
                                                                 // Success
                                                                 fetchActiveRoomParticipants(activeRoom.id);
-                                                                alert(`${user.display_name || user.username} a été ajouté !`);
+                                                                // console.log("Alert silenced: ", `${user.display_name || user.username} a été ajouté !`);
                                                                 setUserSearchQuery('');
                                                                 setUserSearchResults([]);
                                                                 setIsAddMemberModalOpen(false);
                                                             } catch (err: any) {
                                                                 console.error(err);
-                                                                if (err.code === '23505') alert('Cet utilisateur est déjà dans le groupe.');
-                                                                else alert('Erreur lors de l\'ajout.');
+                                                                if (err.code === '23505') { /* error logged */ }
+                                                                else { /* error logged */ }
                                                             }
                                                         }}
                                                         className="w-full flex items-center gap-3 p-3 hover:bg-white/5 text-left transition-all border-b border-white/5 last:border-0"
@@ -2037,3 +2037,4 @@ const Chat: React.FC = () => {
 };
 
 export default Chat;
+

@@ -605,3 +605,4 @@ const ProductCard: React.FC<{ product: Product, onToggleFavorite: (id: string) =
 };
 
 export default Shop;
+

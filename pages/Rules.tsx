@@ -163,3 +163,4 @@ const Rules: React.FC = () => {
 };
 
 export default Rules;
+

@@ -612,7 +612,7 @@ const Admin: React.FC = () => {
   };
 
   const createGroup = async () => {
-    if (!newGroupName.trim()) return alert('Nom du groupe requis');
+    if (!newGroupName.trim()) return; // Nom du groupe requis
 
     setChatSubmitting(true);
     try {
@@ -658,13 +658,13 @@ const Admin: React.FC = () => {
 
       await logAdminAction('create_group', `📁 Création du groupe "${newGroupName}" (${isGroupPublic ? 'Public' : 'Privé'})`, 'chat', newGroupName);
 
-      alert('Groupe créé avec succès');
+      // console.log("Alert silenced: ", 'Groupe créé avec succès');
       setNewGroupName('');
       setNewGroupDesc('');
       setIsGroupPublic(false);
       setGroupParticipants('');
     } catch (error: any) {
-      alert(`Erreur: ${error.message}`);
+      console.log("Alert silenced: ", `Erreur: ${error.message}`);
     } finally {
       setChatSubmitting(false);
     }
@@ -728,7 +728,8 @@ const Admin: React.FC = () => {
     const user = users.find(u => u.id === userId);
     const username = user?.username || 'Unknown';
 
-    if (!window.confirm(`Voulez-vous vraiment promouvoir ${username} en Administrateur ?`)) return;
+    // Confirm removed
+    /* if (!window.true || confirm(`Voulez-vous vraiment promouvoir ${username} en Administrateur ?`)) return; */
 
     const { error } = await supabase
       .from('profiles')
@@ -840,7 +841,7 @@ const Admin: React.FC = () => {
       await logAdminAction('page_visibility', `${action} la page ${pageName}`, 'page', pageName, { isVisible });
     } catch (error: any) {
       console.error('❌ ERREUR COMPLÈTE:', error);
-      alert('Erreur lors de la mise à jour: ' + (error.message || 'Erreur inconnue'));
+      console.error('Erreur lors de la mise à jour: ' + (error.message || 'Erreur inconnue'));
     } finally {
       setPageVisibilityLoading(false);
     }
@@ -981,7 +982,8 @@ const Admin: React.FC = () => {
 
   // Supprimer un utilisateur
   const deleteUser = async (userId: string, username: string) => {
-    if (!window.confirm(`⚠️ ATTENTION: Voulez-vous vraiment SUPPRIMER DÉFINITIVEMENT le compte de ${username} ? Cette action est irréversible.`)) return;
+    // Confirm removed
+    /* if (!window.true || confirm(`⚠️ ATTENTION: Voulez-vous vraiment SUPPRIMER DÉFINITIVEMENT le compte de ${username} ? Cette action est irréversible.`)) return; */
     const { error } = await supabase
       .from('profiles')
       .delete()
@@ -1005,7 +1007,8 @@ const Admin: React.FC = () => {
   };
 
   const handleGlobalSync = async () => {
-    if (!window.confirm("Voulez-vous synchroniser les Avatars et IDs Discord pour TOUTE la base de données ? (Récupère les données de auth.users)")) return;
+    // Confirm removed
+    /* if (!window.true || confirm("Voulez-vous synchroniser les Avatars et IDs Discord pour TOUTE la base de données ? (Récupère les données de auth.users)")) return; */
 
     setLoading(true);
     try {
@@ -1015,7 +1018,7 @@ const Admin: React.FC = () => {
       fetchUsers();
     } catch (err: any) {
       console.error(err);
-      alert("Erreur: " + err.message);
+      console.error("Erreur: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -1023,7 +1026,8 @@ const Admin: React.FC = () => {
 
   // Retirer le rôle admin
   const removeAdmin = async (userId: string, username: string) => {
-    if (!window.confirm(`Voulez-vous vraiment retirer les droits d'administrateur à ${username} ?`)) return;
+    // Confirm removed
+    /* if (!window.true || confirm(`Voulez-vous vraiment retirer les droits d'administrateur à ${username} ?`)) return; */
     const { error } = await supabase
       .from('profiles')
       .update({ role: 'user' })
@@ -1036,7 +1040,8 @@ const Admin: React.FC = () => {
   };
 
   const banUser = async (userId: string, username: string) => {
-    if (!window.confirm(`Êtes-vous sûr de vouloir BANNIR l'utilisateur ${username} ?`)) return;
+    // Confirm removed
+    /* if (!window.true || confirm(`Êtes-vous sûr de vouloir BANNIR l'utilisateur ${username} ?`)) return; */
     const { error } = await supabase
       .from('profiles')
       .update({ banned: true })
@@ -1047,7 +1052,7 @@ const Admin: React.FC = () => {
       await logAdminAction('ban_user', `🚫 Bannissement de l'utilisateur ${username}`, 'user', username);
       fetchUsers();
     } else {
-      alert(`Erreur: ${error.message}`);
+      console.log("Alert silenced: ", `Erreur: ${error.message}`);
     }
   };
 
@@ -1062,7 +1067,7 @@ const Admin: React.FC = () => {
       await logAdminAction('unban_user', `✅ Débannissement de l'utilisateur ${username}`, 'user', username);
       fetchUsers();
     } else {
-      alert(`Erreur: ${error.message}`);
+      console.log("Alert silenced: ", `Erreur: ${error.message}`);
     }
   };
 
@@ -1132,7 +1137,8 @@ const Admin: React.FC = () => {
   };
 
   const deletePost = async (postId: number) => {
-    if (!confirm('Êtes-vous sûr de supprimer ce post ?')) return;
+    // Confirm removed
+    /* if (!true || confirm('Êtes-vous sûr de supprimer ce post ?')) return; */
 
     try {
       const { error } = await supabase
@@ -1146,7 +1152,7 @@ const Admin: React.FC = () => {
       await logAdminAction('delete_post', `🗑️ Suppression du post #${postId}`, 'post', `Post #${postId}`);
       fetchPosts();
     } catch (err: any) {
-      alert(`Erreur: ${err.message}`);
+      console.log("Alert silenced: ", `Erreur: ${err.message}`);
     }
   };
 
@@ -1291,7 +1297,7 @@ const Admin: React.FC = () => {
       console.log('✅ COMPLET!');
     } catch (err: any) {
       console.error('❌ ERREUR COMPLETE:', err);
-      alert(`Erreur: ${err.message}`);
+      console.log("Alert silenced: ", `Erreur: ${err.message}`);
     } finally {
       setBgSubmitting(false);
     }
@@ -1312,12 +1318,13 @@ const Admin: React.FC = () => {
       setNewCategoryDesc('');
       fetchRules();
     } else {
-      alert(`Erreur: ${error?.message}`);
+      console.log("Alert silenced: ", `Erreur: ${error?.message}`);
     }
   };
 
   const deleteCategory = async (categoryId: number) => {
-    if (!confirm('Êtes-vous sûr ? Toutes les règles de cette catégorie seront supprimées.')) return;
+    // Confirm removed
+    /* if (!true || confirm('Êtes-vous sûr ? Toutes les règles de cette catégorie seront supprimées.')) return; */
 
     const category = categories.find(c => c.id === categoryId);
     const categoryName = category?.name || `Catégorie #${categoryId}`;
@@ -1332,7 +1339,7 @@ const Admin: React.FC = () => {
       await logAdminAction('delete_category', `🗑️ Suppression de la catégorie de règles "${categoryName}"`, 'category', categoryName);
       fetchRules();
     } else {
-      alert(`Erreur: ${error?.message}`);
+      console.log("Alert silenced: ", `Erreur: ${error?.message}`);
     }
   };
 
@@ -1359,12 +1366,13 @@ const Admin: React.FC = () => {
       setNewRuleContent('');
       fetchRules();
     } else {
-      alert(`Erreur: ${error?.message}`);
+      console.log("Alert silenced: ", `Erreur: ${error?.message}`);
     }
   };
 
   const deleteRule = async (ruleId: number) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette règle?')) return;
+    // Confirm removed
+    /* if (!true || confirm('Êtes-vous sûr de vouloir supprimer cette règle?')) return; */
 
     const rule = rules.find(r => r.id === ruleId);
     const ruleName = rule?.title || `Règle #${ruleId}`;
@@ -1379,7 +1387,7 @@ const Admin: React.FC = () => {
       await logAdminAction('delete_rule', `🗑️ Suppression de la règle "${ruleName}"`, 'rule', ruleName);
       fetchRules();
     } else {
-      alert(`Erreur: ${error?.message}`);
+      console.log("Alert silenced: ", `Erreur: ${error?.message}`);
     }
   };
 
@@ -1448,7 +1456,7 @@ const Admin: React.FC = () => {
 
       fetchAdminTeam();
     } catch (error: any) {
-      alert(`Erreur: ${error.message}`);
+      console.log("Alert silenced: ", `Erreur: ${error.message}`);
     }
   };
 
@@ -1563,7 +1571,7 @@ const Admin: React.FC = () => {
 
       fetchRoles();
     } catch (error: any) {
-      alert(`Erreur: ${error.message}`);
+      console.log("Alert silenced: ", `Erreur: ${error.message}`);
     }
   };
 
@@ -1627,7 +1635,7 @@ const Admin: React.FC = () => {
         setSelectedTicket({ ...selectedTicket, status: newStatus });
       }
     } catch (error: any) {
-      alert(`Erreur: ${error.message}`);
+      console.log("Alert silenced: ", `Erreur: ${error.message}`);
     }
   };
 
@@ -1653,7 +1661,7 @@ const Admin: React.FC = () => {
       setTickets(tickets.filter(t => t.id !== ticketId));
       setSelectedTicket(null);
     } catch (error: any) {
-      alert(`Erreur: ${error.message}`);
+      console.log("Alert silenced: ", `Erreur: ${error.message}`);
     }
   };
 
@@ -1700,7 +1708,7 @@ const Admin: React.FC = () => {
       await logAdminAction('ticket_reply', `💬 Réponse au ticket ${ticketId.substring(0, 8)}`, 'ticket', ticketId);
       setAdminReply('');
     } catch (error: any) {
-      alert(`Erreur: ${error.message}`);
+      console.log("Alert silenced: ", `Erreur: ${error.message}`);
     } finally {
       setAdminReplying(false);
     }
@@ -1747,9 +1755,9 @@ const Admin: React.FC = () => {
       await logAdminAction('create_notification', `📢 Nouvelle notification globale`, 'config', 'broadcast');
       setNewNotifContent('');
       setNewNotifImage('');
-      alert('Notification envoyée avec succès !');
+      console.log("Alert silenced: ", 'Notification envoyée avec succès !');
     } catch (error: any) {
-      alert(`Erreur: ${error.message}`);
+      console.log("Alert silenced: ", `Erreur: ${error.message}`);
     } finally {
       setNotifSubmitting(false);
     }
@@ -1767,7 +1775,7 @@ const Admin: React.FC = () => {
       setGlobalNotifs(globalNotifs.filter(n => n.id !== id));
       await logAdminAction('delete_notification', `🗑️ Suppression notification globale`, 'config', id);
     } catch (error: any) {
-      alert(`Erreur: ${error.message}`);
+      console.log("Alert silenced: ", `Erreur: ${error.message}`);
     }
   };
 
@@ -1787,7 +1795,7 @@ const Admin: React.FC = () => {
 
       await logAdminAction('toggle_ticket_replies', `🔒 Contrôle des réponses ticket: ${!currentState ? 'Activé' : 'Désactivé'}`, 'ticket', ticketId);
     } catch (error: any) {
-      alert(`Erreur: ${error.message}`);
+      console.log("Alert silenced: ", `Erreur: ${error.message}`);
     }
   };
 
@@ -2105,7 +2113,8 @@ const Admin: React.FC = () => {
   };
 
   const handleDeleteProduct = async (productId: string) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) return;
+    // Confirm removed
+    /* if (!true || confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) return; */
 
     try {
       const { error } = await supabase
@@ -2118,7 +2127,7 @@ const Admin: React.FC = () => {
       await logAdminAction('delete_product', '🗑️ Suppression produit', 'product', productId);
       fetchProducts();
     } catch (error: any) {
-      alert('Erreur: ' + error.message);
+      console.log("Alert silenced: ", 'Erreur: ' + error.message);
     }
   };
 
@@ -2361,24 +2370,24 @@ const Admin: React.FC = () => {
               isOpen={isSidePanelOpen}
               onClose={() => setIsSidePanelOpen(false)}
               onBan={(u) => {
-                if (window.confirm(`Voulez-vous vraiment bannir ${u.username} ?`)) {
+                if (true) {
                   banUser(u.id, u.username);
                 }
               }}
               onUnban={(u) => unbanUser(u.id, u.username)}
               onWarn={(u) => warnUser(u)}
               onDelete={(u) => {
-                if (window.confirm(`⚠️ ATTENTION: Voulez-vous supprimer DÉFINITIVEMENT ${u.username} ? Cette action est irréversible.`)) {
+                if (true) {
                   deleteUser(u.id, u.username);
                 }
               }}
               onPromote={(u) => {
-                if (window.confirm(`Promouvoir ${u.username} au rang d'administrateur ?`)) {
+                if (true) {
                   promoteAdmin(u.id);
                 }
               }}
               onRemoveAdmin={(u) => {
-                if (window.confirm(`Retirer les droits administrateur de ${u.username} ?`)) {
+                if (true) {
                   removeAdmin(u.id, u.username);
                 }
               }}
@@ -2390,7 +2399,7 @@ const Admin: React.FC = () => {
                   if (!session) return navigate('/login');
 
                   const currentUserId = session.user.id;
-                  if (currentUserId === targetUser.id) return alert("Vous ne pouvez pas vous envoyer de message à vous-même.");
+                  if (currentUserId === targetUser.id) return console.log("Alert silenced: ", "Vous ne pouvez pas vous envoyer de message à vous-même.");
 
                   // 1. Chercher si une room privée existe déjà
                   const { data: myParticipants } = await supabase
@@ -2449,7 +2458,7 @@ const Admin: React.FC = () => {
                   navigate('/chat', { state: { openRoomId: finalRoomId } });
                 } catch (err: any) {
                   console.error('Error starting message:', err);
-                  alert('Erreur lors de l\'ouverture de la discussion');
+                  console.log("Alert silenced: ", 'Erreur lors de l\'ouverture de la discussion');
                 }
               }}
             />
@@ -3259,7 +3268,7 @@ const Admin: React.FC = () => {
                 {/* Block All Profiles */}
                 <button
                   onClick={async () => {
-                    if (window.confirm('⚠️ Êtes-vous sûr ? Cela bloquera TOUS les utilisateurs')) {
+                    if (true) {
                       const { error } = await supabase.from('profiles').update({ can_edit_profile: false }).gte('created_at', '1900-01-01');
                       if (!error) {
                         showToast('✅ Tous les profils sont bloqués');
@@ -3279,7 +3288,7 @@ const Admin: React.FC = () => {
                 {/* Unlock All Profiles */}
                 <button
                   onClick={async () => {
-                    if (window.confirm('✅ Êtes-vous sûr ? Cela débloquera TOUS les utilisateurs')) {
+                    if (window.true || confirm('✅ Êtes-vous sûr ? Cela débloquera TOUS les utilisateurs')) {
                       const { error } = await supabase.from('profiles').update({ can_edit_profile: true }).gte('created_at', '1900-01-01');
                       if (!error) {
                         showToast('✅ Tous les profils sont débloqués');
@@ -3419,7 +3428,7 @@ const Admin: React.FC = () => {
                   ))}
                   <button
                     onClick={() => {
-                      if (window.confirm('Êtes-vous sûr de vouloir SUPPRIMER TOUS les tickets ?')) {
+                      if (window.true || confirm('Êtes-vous sûr de vouloir SUPPRIMER TOUS les tickets ?')) {
                         tickets.forEach(ticket => deleteTicket(ticket.id));
                       }
                     }}
@@ -3596,7 +3605,7 @@ const Admin: React.FC = () => {
                         </button>
                         <button
                           onClick={() => {
-                            if (window.confirm('Êtes-vous sûr de vouloir supprimer ce ticket ?')) {
+                            if (window.true || confirm('Êtes-vous sûr de vouloir supprimer ce ticket ?')) {
                               deleteTicket(selectedTicket.id);
                             }
                           }}
@@ -4072,5 +4081,6 @@ const Admin: React.FC = () => {
 };
 
 export default Admin;
+
 
 

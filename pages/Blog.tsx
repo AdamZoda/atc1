@@ -186,7 +186,6 @@ const Blog: React.FC = () => {
 
     const deletePost = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!window.confirm('Voulez-vous vraiment supprimer cet article ?')) return;
 
         try {
             const { error } = await supabase.from('blog_posts').delete().eq('id', id);
@@ -425,3 +424,4 @@ const Blog: React.FC = () => {
 };
 
 export default Blog;
+
