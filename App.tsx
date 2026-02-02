@@ -74,12 +74,28 @@ const AppContent = () => {
       heartbeatInterval = setInterval(updatePresence, 30000);
     };
 
+    let profileSubscription: any;
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) {
         localStorage.removeItem(`geo-notification-refused-${session.user.id}`);
         fetchProfile(session.user.id);
         startHeartbeat();
+
+        // Subscribe to profile changes
+        profileSubscription = supabase
+          .channel(`profile-updates-${session.user.id}`)
+          .on(
+            'postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${session.user.id}` },
+            (payload) => {
+              if (payload.new) {
+                setProfile(prev => prev ? { ...prev, ...(payload.new as Profile) } : (payload.new as Profile));
+              }
+            }
+          )
+          .subscribe();
       } else setLoading(false);
     });
 
@@ -88,17 +104,35 @@ const AppContent = () => {
       if (session) {
         localStorage.removeItem(`geo-notification-refused-${session.user.id}`);
         fetchProfile(session.user.id);
-        if (event === 'SIGNED_IN') startHeartbeat();
+        if (event === 'SIGNED_IN') {
+          startHeartbeat();
+          // Subscription logic
+          if (profileSubscription) supabase.removeChannel(profileSubscription);
+          profileSubscription = supabase
+            .channel(`profile-updates-${session.user.id}`)
+            .on(
+              'postgres_changes',
+              { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${session.user.id}` },
+              (payload) => {
+                if (payload.new) {
+                  setProfile(prev => prev ? { ...prev, ...(payload.new as Profile) } : (payload.new as Profile));
+                }
+              }
+            )
+            .subscribe();
+        }
       } else {
         setProfile(null);
         setLoading(false);
         if (heartbeatInterval) clearInterval(heartbeatInterval);
+        if (profileSubscription) supabase.removeChannel(profileSubscription);
       }
     });
 
     return () => {
       subscription.unsubscribe();
       if (heartbeatInterval) clearInterval(heartbeatInterval);
+      if (profileSubscription) supabase.removeChannel(profileSubscription);
     };
   }, []);
 

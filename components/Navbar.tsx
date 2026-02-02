@@ -109,7 +109,7 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
         <div className="hidden sm:flex items-center gap-2 md:gap-4 flex-shrink-0">
           {profile ? (
             <div className="flex items-center gap-2 md:gap-4">
-              <Link to="/profile" className="flex items-center gap-2 md:gap-3 shrink-0">
+              <Link to="/profile" className="flex items-center gap-2 md:gap-3 shrink-0 relative">
                 <img
                   src={profile.avatar_url || DEFAULT_AVATAR}
                   alt="avatar"
@@ -121,6 +121,9 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
                     target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.display_name || profile.username || 'User')}&background=random&color=fff`;
                   }}
                 />
+                {(profile.has_ticket_notification || profile.has_global_notification) && (
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 border-2 border-luxury-dark rounded-full animate-pulse" />
+                )}
               </Link>
 
               <div className="hidden lg:flex flex-col items-end">
@@ -193,13 +196,18 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
                     <Link
                       to="/profile"
                       onClick={() => setIsOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 transition-all"
+                      className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/5 transition-all relative"
                     >
-                      <img
-                        src={profile.avatar_url || DEFAULT_AVATAR}
-                        alt="avatar"
-                        className="w-8 h-8 rounded-full border border-white/10"
-                      />
+                      <div className="relative">
+                        <img
+                          src={profile.avatar_url || DEFAULT_AVATAR}
+                          alt="avatar"
+                          className="w-8 h-8 rounded-full border border-white/10"
+                        />
+                        {(profile.has_ticket_notification || profile.has_global_notification) && (
+                          <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 border-2 border-luxury-dark rounded-full animate-pulse" />
+                        )}
+                      </div>
                       <div className="flex flex-col">
                         <span className="text-sm font-bold text-white leading-none mb-1">
                           {profile.display_name || profile.username}

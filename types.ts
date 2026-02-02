@@ -17,6 +17,8 @@ export interface Profile {
   provider_id?: string;
   created_at?: string;
   can_edit_profile?: boolean;
+  has_ticket_notification?: boolean;
+  has_global_notification?: boolean;
 }
 
 export interface Post {

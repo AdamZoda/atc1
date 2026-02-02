@@ -496,6 +496,13 @@ const Admin: React.FC = () => {
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [productCategories, setProductCategories] = useState<any[]>([]);
 
+  // Global notifications (broadcast)
+  const [globalNotifs, setGlobalNotifs] = useState<any[]>([]);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [newNotifContent, setNewNotifContent] = useState('');
+  const [newNotifImage, setNewNotifImage] = useState('');
+  const [notifSubmitting, setNotifSubmitting] = useState(false);
+
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) {
@@ -1699,6 +1706,71 @@ const Admin: React.FC = () => {
     }
   };
 
+  // Global Notifications Management
+  const fetchGlobalNotifications = async () => {
+    try {
+      setNotifLoading(true);
+      const { data, error } = await supabase
+        .from('global_notifications')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setGlobalNotifs(data || []);
+    } catch (error: any) {
+      console.error('Error fetching global notifs:', error);
+    } finally {
+      setNotifLoading(false);
+    }
+  };
+
+  const createGlobalNotification = async () => {
+    if (!newNotifContent.trim()) return;
+
+    setNotifSubmitting(true);
+    try {
+      const { data, error } = await supabase
+        .from('global_notifications')
+        .insert([{
+          content: newNotifContent,
+          image_url: newNotifImage,
+          created_by: profile?.id
+        }])
+        .select();
+
+      if (error) throw error;
+
+      if (data && data[0]) {
+        setGlobalNotifs([data[0], ...globalNotifs]);
+      }
+
+      await logAdminAction('create_notification', `📢 Nouvelle notification globale`, 'config', 'broadcast');
+      setNewNotifContent('');
+      setNewNotifImage('');
+      alert('Notification envoyée avec succès !');
+    } catch (error: any) {
+      alert(`Erreur: ${error.message}`);
+    } finally {
+      setNotifSubmitting(false);
+    }
+  };
+
+  const deleteGlobalNotification = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('global_notifications')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setGlobalNotifs(globalNotifs.filter(n => n.id !== id));
+      await logAdminAction('delete_notification', `🗑️ Suppression notification globale`, 'config', id);
+    } catch (error: any) {
+      alert(`Erreur: ${error.message}`);
+    }
+  };
+
   const toggleUserReplies = async (ticketId: string, currentState: boolean) => {
     try {
       const { error } = await supabase
@@ -2090,6 +2162,7 @@ const Admin: React.FC = () => {
               onClick={() => {
                 setActiveTab('config');
                 fetchAdminTeam();
+                fetchGlobalNotifications();
               }}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'config' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
             >
@@ -3097,61 +3170,138 @@ const Admin: React.FC = () => {
 
         {/* PROFILE PERMISSIONS SECTION */}
         {activeTab === 'config' && (
-          <div className="glass p-8 rounded-2xl border border-white/5 col-span-1 lg:col-span-2 mt-6">
-            <div className="text-center mb-8">
-              <div className="w-12 h-12 bg-luxury-gold/10 rounded-xl flex items-center justify-center mx-auto mb-4 text-luxury-gold">
-                🔐
+          <div className="space-y-6">
+            {/* Global Notifications Section */}
+            <div className="glass p-8 rounded-2xl border border-white/5">
+              <div className="text-center mb-8">
+                <div className="w-12 h-12 bg-luxury-gold/10 rounded-xl flex items-center justify-center mx-auto mb-4 text-luxury-gold">
+                  <Send size={24} />
+                </div>
+                <h3 className="text-xl font-cinzel font-bold uppercase tracking-widest">📢 Notifications Globales</h3>
+                <p className="text-gray-500 text-xs mt-1">Envoyer un message à TOUS les utilisateurs (affiché dans leur profil)</p>
               </div>
-              <h3 className="text-xl font-cinzel font-bold uppercase tracking-widest">Permissions de Profil</h3>
-              <p className="text-gray-500 text-xs mt-1">Bloquer/Débloquer les modifications pour TOUS les utilisateurs</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Form Section */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Message</label>
+                    <textarea
+                      value={newNotifContent}
+                      onChange={(e) => setNewNotifContent(e.target.value)}
+                      placeholder="Contenu de la notification..."
+                      className="w-full h-32 bg-black/40 border border-white/10 rounded-xl p-4 text-sm text-white focus:border-luxury-gold transition-all outline-none resize-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">URL Image (optionnel)</label>
+                    <input
+                      type="text"
+                      value={newNotifImage}
+                      onChange={(e) => setNewNotifImage(e.target.value)}
+                      placeholder="https://..."
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-luxury-gold transition-all outline-none"
+                    />
+                  </div>
+                  <button
+                    onClick={createGlobalNotification}
+                    disabled={notifSubmitting || !newNotifContent.trim()}
+                    className="w-full py-4 bg-luxury-gold text-black font-black uppercase tracking-widest rounded-xl hover:bg-luxury-goldLight transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {notifSubmitting ? <RefreshCcw className="animate-spin" size={18} /> : <Send size={18} />}
+                    Diffuser la Notification
+                  </button>
+                </div>
+
+                {/* List Section */}
+                <div className="space-y-4">
+                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Historique des Notifications</label>
+                  <div className="bg-black/20 border border-white/5 rounded-xl p-4 max-h-[400px] overflow-y-auto space-y-3">
+                    {notifLoading ? (
+                      <div className="flex justify-center p-8"><RefreshCcw className="animate-spin text-luxury-gold" /></div>
+                    ) : globalNotifs.length === 0 ? (
+                      <p className="text-gray-500 text-center text-xs py-4">Aucune notification active</p>
+                    ) : (
+                      globalNotifs.map((notif) => (
+                        <div key={notif.id} className="p-4 bg-white/5 border border-white/5 rounded-lg flex items-start gap-4">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-white whitespace-pre-wrap">{notif.content}</p>
+                            {notif.image_url && (
+                              <img src={notif.image_url} alt="Notification" className="mt-2 h-16 w-auto rounded object-cover border border-white/10" />
+                            )}
+                            <p className="text-[10px] text-gray-500 mt-2">{new Date(notif.created_at).toLocaleString()}</p>
+                          </div>
+                          <button
+                            onClick={() => deleteGlobalNotification(notif.id)}
+                            className="p-2 text-gray-500 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Block All Profiles */}
-              <button
-                onClick={async () => {
-                  if (window.confirm('⚠️ Êtes-vous sûr ? Cela bloquera TOUS les utilisateurs')) {
-                    const { error } = await supabase.from('profiles').update({ can_edit_profile: false }).gte('created_at', '1900-01-01');
-                    if (!error) {
-                      showToast('✅ Tous les profils sont bloqués');
-                      await logAdminAction('bulk_block_profiles', '🔒 Tous les profils ont été bloqués', 'config', 'bulk');
-                      fetchUsers();
-                    } else {
-                      showToast('❌ Erreur: ' + error.message);
-                    }
-                  }
-                }}
-                className="p-6 rounded-lg bg-red-500/10 border-2 border-red-500/30 hover:border-red-500/60 hover:bg-red-500/20 transition-all"
-              >
-                <div className="text-lg font-bold text-red-400 mb-2">🔒 Bloquer TOUS</div>
-                <p className="text-xs text-red-300">Les utilisateurs ne peuvent pas modifier leur profil</p>
-              </button>
+            {/* Profile Permissions Section */}
+            <div className="glass p-8 rounded-2xl border border-white/5 mt-6">
+              <div className="text-center mb-8">
+                <div className="w-12 h-12 bg-luxury-gold/10 rounded-xl flex items-center justify-center mx-auto mb-4 text-luxury-gold">
+                  🔐
+                </div>
+                <h3 className="text-xl font-cinzel font-bold uppercase tracking-widest">Permissions de Profil</h3>
+                <p className="text-gray-500 text-xs mt-1">Bloquer/Débloquer les modifications pour TOUS les utilisateurs</p>
+              </div>
 
-              {/* Unlock All Profiles */}
-              <button
-                onClick={async () => {
-                  if (window.confirm('✅ Êtes-vous sûr ? Cela débloquera TOUS les utilisateurs')) {
-                    const { error } = await supabase.from('profiles').update({ can_edit_profile: true }).gte('created_at', '1900-01-01');
-                    if (!error) {
-                      showToast('✅ Tous les profils sont débloqués');
-                      await logAdminAction('bulk_unlock_profiles', '🔓 Tous les profils ont été débloqués', 'config', 'bulk');
-                      fetchUsers();
-                    } else {
-                      showToast('❌ Erreur: ' + error.message);
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Block All Profiles */}
+                <button
+                  onClick={async () => {
+                    if (window.confirm('⚠️ Êtes-vous sûr ? Cela bloquera TOUS les utilisateurs')) {
+                      const { error } = await supabase.from('profiles').update({ can_edit_profile: false }).gte('created_at', '1900-01-01');
+                      if (!error) {
+                        showToast('✅ Tous les profils sont bloqués');
+                        await logAdminAction('bulk_block_profiles', '🔒 Tous les profils ont été bloqués', 'config', 'bulk');
+                        fetchUsers();
+                      } else {
+                        showToast('❌ Erreur: ' + error.message);
+                      }
                     }
-                  }
-                }}
-                className="p-6 rounded-lg bg-green-500/10 border-2 border-green-500/30 hover:border-green-500/60 hover:bg-green-500/20 transition-all"
-              >
-                <div className="text-lg font-bold text-green-400 mb-2">🔓 Débloquer TOUS</div>
-                <p className="text-xs text-green-300">Les utilisateurs peuvent modifier leur profil</p>
-              </button>
-            </div>
+                  }}
+                  className="p-6 rounded-lg bg-red-500/10 border-2 border-red-500/30 hover:border-red-500/60 hover:bg-red-500/20 transition-all"
+                >
+                  <div className="text-lg font-bold text-red-400 mb-2">🔒 Bloquer TOUS</div>
+                  <p className="text-xs text-red-300">Les utilisateurs ne peuvent pas modifier leur profil</p>
+                </button>
 
-            <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-600/30 rounded-xl">
-              <p className="text-yellow-500 text-xs font-bold uppercase tracking-widest">
-                ⚠️ Attention: Ces actions s'appliquent à TOUS les utilisateurs à la fois. Vous pouvez aussi gérer les permissions individuelles depuis la liste des utilisateurs.
-              </p>
+                {/* Unlock All Profiles */}
+                <button
+                  onClick={async () => {
+                    if (window.confirm('✅ Êtes-vous sûr ? Cela débloquera TOUS les utilisateurs')) {
+                      const { error } = await supabase.from('profiles').update({ can_edit_profile: true }).gte('created_at', '1900-01-01');
+                      if (!error) {
+                        showToast('✅ Tous les profils sont débloqués');
+                        await logAdminAction('bulk_unlock_profiles', '🔓 Tous les profils ont été débloqués', 'config', 'bulk');
+                        fetchUsers();
+                      } else {
+                        showToast('❌ Erreur: ' + error.message);
+                      }
+                    }
+                  }}
+                  className="p-6 rounded-lg bg-green-500/10 border-2 border-green-500/30 hover:border-green-500/60 hover:bg-green-500/20 transition-all"
+                >
+                  <div className="text-lg font-bold text-green-400 mb-2">🔓 Débloquer TOUS</div>
+                  <p className="text-xs text-green-300">Les utilisateurs peuvent modifier leur profil</p>
+                </button>
+              </div>
+
+              <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-600/30 rounded-xl">
+                <p className="text-yellow-500 text-xs font-bold uppercase tracking-widest">
+                  ⚠️ Attention: Ces actions s'appliquent à TOUS les utilisateurs à la fois. Vous pouvez aussi gérer les permissions individuelles depuis la liste des utilisateurs.
+                </p>
+              </div>
             </div>
           </div>
         )}
