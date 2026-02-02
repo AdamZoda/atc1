@@ -828,14 +828,14 @@ const Chat: React.FC = () => {
     );
 
     return (
-        <div className="h-screen pt-28 pb-2 md:pt-24 md:pb-8 px-2 md:px-8 bg-luxury-dark overflow-hidden">
+        <div className="h-screen pt-32 pb-4 md:pt-40 md:pb-8 px-2 md:px-8 bg-luxury-dark overflow-hidden">
             <div className="max-w-7xl mx-auto h-full flex glass rounded-[2rem] overflow-hidden border border-white/5 shadow-2xl relative">
 
                 {/* Sidebar */}
                 <div className={`
           ${isMobileSidebarOpen ? 'flex' : 'hidden'} md:flex
           flex-col w-full md:w-80 lg:w-96 border-r border-white/5 bg-luxury-dark md:bg-black/20 backdrop-blur-md
-          absolute md:relative inset-0 z-[40] md:z-auto
+          absolute md:relative inset-0 z-[50] md:z-auto
         `}>
                     <div className="p-4 md:p-6 border-b border-white/5">
                         <div className="flex items-center justify-between mb-4 md:mb-6">
@@ -1210,7 +1210,7 @@ const Chat: React.FC = () => {
                                                                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                                                                     animate={{ opacity: 1, y: 0, scale: 1 }}
                                                                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                                                    className="absolute bottom-full left-0 mb-4 w-[280px] md:w-[350px] max-h-[400px] glass rounded-3xl border border-white/10 shadow-2xl z-[100] overflow-hidden flex flex-col"
+                                                                    className="absolute bottom-full left-0 mb-4 w-[85vw] md:w-[350px] max-h-[40vh] md:max-h-[400px] glass rounded-3xl border border-white/10 shadow-2xl z-[100] overflow-hidden flex flex-col"
                                                                 >
                                                                     <div className="p-4 border-b border-white/10 bg-black/20 backdrop-blur-md">
                                                                         <h4 className="text-[10px] font-black uppercase tracking-widest text-luxury-gold">Emoji Picker</h4>

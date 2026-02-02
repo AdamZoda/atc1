@@ -94,20 +94,24 @@ const Shop: React.FC = () => {
 
   return (
     <AccessControl pageName="Shop">
-      <div className="min-h-screen pt-24 pb-12 px-4 md:px-8 max-w-7xl mx-auto">
+      <div className="min-h-screen pt-32 md:pt-40 lg:pt-48 pb-12 px-4 md:px-8 max-w-7xl mx-auto">
 
         {/* Header Section */}
-        <div className="mb-12 text-center">
-          <h1 className="text-4xl md:text-6xl font-black font-cinzel text-white mb-2 tracking-wider">
+        <div className="mb-16 text-center">
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-black font-cinzel text-white mb-4 tracking-wider">
             ATLAN<span className="text-luxury-gold">TIC</span> SHOP
           </h1>
-          <p className="text-gray-400 text-lg uppercase tracking-widest">
-            Exclusivité & Prestige
-          </p>
+          <div className="flex items-center justify-center gap-4">
+            <div className="h-px w-12 bg-luxury-gold/30 hidden md:block"></div>
+            <p className="text-gray-400 text-sm md:text-lg uppercase tracking-[0.4em] font-light">
+              Exclusivité & Prestige
+            </p>
+            <div className="h-px w-12 bg-luxury-gold/30 hidden md:block"></div>
+          </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-col md:flex-row gap-4 mb-8 bg-black/40 p-4 rounded-xl border border-white/5 backdrop-blur-sm">
+        {/* Filters - Sticky on Mobile/Desktop */}
+        <div className="sticky top-24 z-20 flex flex-col md:flex-row gap-4 mb-12 bg-black/60 p-4 rounded-2xl border border-white/10 backdrop-blur-xl shadow-2xl">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
             <input
@@ -338,7 +342,7 @@ const ProductCard: React.FC<{ product: Product }> = ({ product }) => {
             <DialogTitle>{product.name}</DialogTitle>
             <DialogDescription>Détails du produit</DialogDescription>
           </VisuallyHidden.Root>
-          <div className="grid grid-cols-1 md:grid-cols-[70%_30%] w-full h-full">
+          <div className="flex flex-col md:grid md:grid-cols-[70%_30%] w-full h-full overflow-y-auto md:overflow-hidden">
             {/* Left: Images */}
             <div className="relative h-64 md:h-full bg-black/50 group">
               {media.length > 0 ? (
@@ -406,7 +410,7 @@ const ProductCard: React.FC<{ product: Product }> = ({ product }) => {
             </div>
 
             {/* Right: Info */}
-            <div className="p-8 flex flex-col h-full bg-gradient-to-b from-black/80 to-black/40">
+            <div className="p-6 md:p-8 flex flex-col h-full bg-gradient-to-b from-black/80 to-black/40 border-t md:border-t-0 md:border-l border-white/10">
               <div className="mb-6">
                 <h2 className="text-3xl md:text-4xl font-cinzel font-black text-white mb-2">{product.name}</h2>
                 {product.category && (

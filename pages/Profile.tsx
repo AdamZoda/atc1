@@ -206,7 +206,7 @@ const ProfilePage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-luxury-dark pt-28 md:pt-32 lg:pt-36 pb-12 px-4">
+    <div className="min-h-screen bg-luxury-dark pt-32 md:pt-40 lg:pt-48 pb-12 px-4">
       <div className="max-w-3xl mx-auto">
         <header className="mb-8">
           <h1 className="font-cinzel text-4xl font-black text-white mb-2">Mon Profil</h1>

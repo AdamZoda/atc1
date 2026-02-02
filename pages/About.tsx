@@ -341,7 +341,7 @@ const About: React.FC = () => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="relative min-h-screen pt-28 md:pt-32 lg:pt-36"
+        className="relative min-h-screen pt-32 md:pt-40 lg:pt-48"
       >
         {/* HEADER SECTION */}
         <div className="relative py-20 px-4 sm:px-6 lg:px-8">

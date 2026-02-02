@@ -50,7 +50,7 @@ const Features: React.FC = () => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="pt-528 md:pt-32 lg:pt-36 pb-24 bg-luxury-dark min-h-screen"
+        className="pt-32 md:pt-40 lg:pt-48 pb-24 bg-luxury-dark min-h-screen"
       >
         <div className="max-w-7xl mx-auto px-6">
           <header className="text-center mb-20">

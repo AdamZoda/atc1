@@ -81,7 +81,7 @@ const Home: React.FC = () => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="relative min-h-screen pt-28 md:pt-32 lg:pt-10"
+      className="relative min-h-screen pt-32 md:pt-40 lg:pt-10"
     >
 
       {/* Hero Section */}
@@ -113,7 +113,7 @@ const Home: React.FC = () => {
         </div>
 
         {/* Content & 3D Model Grid */}
-        <div className="relative z-10 w-full max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center h-full pt-20 lg:pt-0">
+        <div className="relative z-10 w-full max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center h-full pt-32 lg:pt-0">
 
           {/* Left Column: Text Content */}
           <div className="text-center lg:text-left order-2 lg:order-1">
