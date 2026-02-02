@@ -5,12 +5,12 @@ import RichTextEditor from '../components/Blog/RichTextEditor';
 import {
     ArrowLeft, Save, Eye, Settings, Calendar,
     Globe, Layout, Tag, MapPin, ChevronDown, Check,
-    MoreHorizontal, Image as ImageIcon, User, Clock, Plus, Trash2
+    MoreHorizontal, Image as ImageIcon, User, Clock, Plus, Trash2, Share2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import Toast from '../components/Toast';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 interface BlogPost {
     id: string;
@@ -41,12 +41,42 @@ const Blog: React.FC = () => {
     const [editorContent, setEditorContent] = useState<string>('');
     const [isAutoSaving, setIsAutoSaving] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const navigate = useNavigate();
+
+    const { slug } = useParams();
 
     // Initial Load
     useEffect(() => {
         checkUser();
-        fetchPosts();
-    }, []);
+        if (slug) {
+            fetchPostBySlug(slug);
+        } else {
+            fetchPosts();
+        }
+    }, [slug]);
+
+    const fetchPostBySlug = async (postSlug: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('blog_posts')
+                .select(`*, profiles(display_name)`)
+                .eq('slug', postSlug)
+                .single();
+
+            if (error) throw error;
+            if (data) {
+                setCurrentPost(data);
+                setEditorContent(data.content || '');
+                setView('read');
+                // Increment views
+                await supabase.from('blog_posts').update({ views: (data.views || 0) + 1 }).eq('id', data.id);
+            }
+        } catch (err: any) {
+            console.error('Error fetching post by slug:', err);
+            setToast({ message: "Article introuvable", type: 'error' });
+            fetchPosts();
+        }
+    };
 
     const checkUser = async () => {
         const { data: { user } } = await supabase.auth.getUser();
@@ -189,13 +219,23 @@ const Blog: React.FC = () => {
                     </div>
 
                     <div className="relative h-full max-w-7xl mx-auto px-6 flex flex-col justify-center items-center text-center">
-                        <button onClick={() => setView('list')} className="absolute top-8 left-6 flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
-                            <ArrowLeft size={20} /> Retour
+                        <button onClick={() => navigate('/blog')} className="absolute top-8 left-6 flex items-center gap-2 text-gray-400 hover:text-white transition-colors bg-white/5 px-4 py-2 rounded-lg border border-white/5">
+                            <ArrowLeft size={20} /> Retour au journal
                         </button>
                         <h1 className="text-4xl md:text-6xl font-cinzel font-bold text-[#c5a059] mb-6 drop-shadow-2xl">{currentPost.title}</h1>
                         <div className="flex items-center gap-6 text-gray-300">
                             <div className="flex items-center gap-2"><User size={18} className="text-[#c5a059]" /><span>{currentPost.profiles?.display_name || 'Admin'}</span></div>
-                            <div className="flex items-center gap-2"><Calendar size={18} className="text-[#c5a059]" /><span>{format(new Date(currentPost.created_at || new Date()), 'dd MMMM yyyy', { locale: fr })}</span></div>
+                            <div className="flex items-center gap-2"><Calendar size={18} className="text-[#c5a059]" /><span>{currentPost.created_at ? format(new Date(currentPost.created_at), 'dd MMMM yyyy', { locale: fr }) : ''}</span></div>
+                            <button
+                                onClick={() => {
+                                    const url = `${window.location.origin}/#/blog/${currentPost.slug}`;
+                                    navigator.clipboard.writeText(url);
+                                    setToast({ message: 'Lien copié !', type: 'success' });
+                                }}
+                                className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 transition-all text-xs"
+                            >
+                                <Share2 size={16} className="text-[#c5a059]" /> Partager
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -325,7 +365,12 @@ const Blog: React.FC = () => {
                             <div className="col-span-6 flex items-center gap-4">
                                 {post.cover_image && <img src={post.cover_image} className="w-16 h-16 rounded-lg object-cover border border-white/10 group-hover:scale-105 transition-transform" />}
                                 <div>
-                                    <h3 className="font-cinzel font-bold text-white text-lg group-hover:text-[#c5a059] transition-colors cursor-pointer" onClick={() => handleEditPost(post)}>{post.title}</h3>
+                                    <h3
+                                        className="font-cinzel font-bold text-white text-lg group-hover:text-[#c5a059] transition-colors cursor-pointer"
+                                        onClick={() => navigate(`/blog/${post.slug}`)}
+                                    >
+                                        {post.title}
+                                    </h3>
                                     <div className="flex items-center gap-3 mt-2">
                                         <span className={`px-2 py-0.5 rounded-[4px] text-[10px] uppercase font-black tracking-wider ${post.status === 'published' ? 'bg-[#c5a059] text-black' : 'bg-gray-800 text-gray-400'}`}>{post.status === 'published' ? 'Publié' : 'Brouillon'}</span>
                                         <span className="text-[10px] text-gray-500 flex items-center gap-1"><Eye size={12} /> {post.views || 0}</span>

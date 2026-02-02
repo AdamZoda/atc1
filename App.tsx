@@ -281,6 +281,7 @@ const AppContent = () => {
               <Route path="/community" element={<Community />} />
               <Route path="/shop" element={<Shop />} />
               <Route path="/blog" element={<Blog />} />
+              <Route path="/blog/:slug" element={<Blog />} />
 
               {/* Protected Routes */}
               <Route
