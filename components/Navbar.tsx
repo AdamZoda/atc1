@@ -36,7 +36,7 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
       { label: t('nav.media'), path: '/media', restricted: true, visible: isPageVisible('Gallery') },
     ];
 
-    if (profile?.role === 'admin') {
+    if (profile?.role === 'admin' || profile?.role === 'staff') {
       links.push({ label: t('nav.admin'), path: '/admin', adminOnly: true, visible: true });
     }
 

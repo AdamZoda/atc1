@@ -3,15 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../supabaseClient';
 import { Profile, Post, RuleCategory, Rule } from '../types';
-import { Users, FilePlus, ShieldCheck, Trash2, Upload, Send, LayoutDashboard, Settings, Video, Image as ImageIcon, BookOpen, History, Activity, Ticket, Music, Play, Pause, Copy, Check, Clock, Calendar, X, RefreshCcw, MessageSquare, ShoppingBag, Package } from 'lucide-react';
+import { Users, FilePlus, FileText, ShieldCheck, Trash2, Upload, Send, LayoutDashboard, Settings, Video, Image as ImageIcon, BookOpen, History, Activity, Ticket, Music, Play, Pause, Copy, Check, Clock, Calendar, X, RefreshCcw, MessageSquare, ShoppingBag, Package } from 'lucide-react';
 import ProductForm from '../components/ProductForm';
 import { useLanguage } from '../LanguageContext';
 import LocationDisplay from '../components/LocationDisplay';
 
-// Fonction silencieuse pour afficher une notification sans alerte
-const showToast = (message: string) => {
-  console.log('ℹ️', message);
-};
+import Toast from '../components/Toast';
 
 // --- NOUVEAUX COMPOSANTS POUR L'INTERFACE TXADMIN ---
 
@@ -75,7 +72,11 @@ const UserCard: React.FC<{
           <p className="text-[10px] text-gray-400 font-mono truncate opacity-60">ID: {user.id.slice(0, 8)}...</p>
 
           <div className="flex flex-wrap items-center gap-1.5 mt-2">
-            <span className={`text-[8px] px-1.5 py-0.5 rounded-md font-black uppercase tracking-widest ${user.role === 'admin' ? 'bg-luxury-gold text-black' : 'bg-white/10 text-gray-400'
+            <span className={`text-[8px] px-1.5 py-0.5 rounded-md font-black uppercase tracking-widest ${user.role === 'admin'
+              ? 'bg-luxury-gold text-black'
+              : user.role === 'staff'
+                ? 'bg-indigo-500 text-white'
+                : 'bg-white/10 text-gray-400'
               }`}>
               {user.role}
             </span>
@@ -96,7 +97,7 @@ const UserCard: React.FC<{
 };
 
 // Panneau latéral détaillé (Side Panel)
-const UserSidePanel: React.FC<{
+const PlayerDetailsModal: React.FC<{
   user: Profile | null;
   isOpen: boolean;
   onClose: () => void;
@@ -104,14 +105,15 @@ const UserSidePanel: React.FC<{
   onUnban: (user: Profile) => void;
   onWarn: (user: Profile) => void;
   onDelete: (user: Profile) => void;
-  onPromote: (user: Profile) => void;
+  onPromote: (user: Profile, role: 'admin' | 'staff') => void;
   onRemoveAdmin: (user: Profile) => void;
   onUpdateNotes: (userId: string, notes: string) => void;
   onSync?: () => void;
   onMessage?: (user: Profile) => void;
-}> = ({ user, isOpen, onClose, onBan, onUnban, onWarn, onDelete, onPromote, onRemoveAdmin, onUpdateNotes, onSync, onMessage }) => {
+  currentRole?: string;
+}> = ({ user, isOpen, onClose, onBan, onUnban, onWarn, onDelete, onPromote, onRemoveAdmin, onUpdateNotes, onSync, onMessage, currentRole }) => {
   const [localNotes, setLocalNotes] = React.useState('');
-  const [activeSubTab, setActiveSubTab] = React.useState<'overview' | 'json'>('overview');
+  const [activeTab, setActiveTab] = React.useState<'actions' | 'info' | 'notes' | 'json'>('actions');
   const [rawAuthData, setRawAuthData] = React.useState<any>(null);
   const [loadingAuth, setLoadingAuth] = React.useState(false);
 
@@ -151,13 +153,8 @@ const UserSidePanel: React.FC<{
   React.useEffect(() => {
     if (user) {
       setLocalNotes(user.admin_notes || '');
-      setActiveSubTab('overview');
+      setActiveTab('actions');
       setRawAuthData(null);
-    }
-  }, [user]);
-
-  React.useEffect(() => {
-    if (user && !rawAuthData) {
       fetchRawAuth(user.id);
     }
   }, [user]);
@@ -167,218 +164,240 @@ const UserSidePanel: React.FC<{
   const isActuallyOnline = user.last_seen && (Date.now() - new Date(user.last_seen).getTime() < 120000);
   const hasGPS = user.latitude && user.longitude;
 
+  const tabs = [
+    { id: 'actions', label: 'Actions', icon: <Activity size={18} /> },
+    { id: 'info', label: 'Info', icon: <Users size={18} /> },
+    { id: 'notes', label: 'Notes', icon: <FileText size={18} /> },
+    { id: 'json', label: 'IDs / JSON', icon: <History size={18} /> },
+  ] as const;
+
   return (
-    <>
-      {/* Backdrop overlay */}
-      <AnimatePresence>
-        {isOpen && (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 flex items-center justify-center z-[1000] p-4">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999]"
+            className="fixed inset-0 bg-black/80 backdrop-blur-md"
           />
-        )}
-      </AnimatePresence>
-
-      <motion.div
-        initial={{ x: '100%' }}
-        animate={{ x: isOpen ? 0 : '100%' }}
-        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-        className="fixed top-0 right-0 w-full max-w-md h-full bg-[#0a0a0a] border-l border-white/10 z-[1000] shadow-2xl overflow-y-auto"
-      >
-        {/* Header Panel */}
-        <div className="p-6 border-b border-white/10 flex items-center justify-between sticky top-0 bg-[#0a0a0a] z-10">
-          <h2 className="text-xl font-black text-white uppercase tracking-widest">Détails Joueur</h2>
-          <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-all">
-            <X size={24} />
-          </button>
-        </div>
-
-        {/* Tab Switcher */}
-        <div className="flex px-8 mt-4 gap-4 border-b border-white/5">
-          <button
-            onClick={() => setActiveSubTab('overview')}
-            className={`pb-4 text-[10px] font-black uppercase tracking-widest transition-all relative ${activeSubTab === 'overview' ? 'text-luxury-gold' : 'text-gray-500 hover:text-gray-300'}`}
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="w-full max-w-4xl h-[650px] bg-[#0d0d0d] border border-white/10 rounded-[2rem] overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] flex relative z-10"
           >
-            Aperçu
-            {activeSubTab === 'overview' && <motion.div layoutId="subtab-active" className="absolute bottom-0 left-0 right-0 h-0.5 bg-luxury-gold" />}
-          </button>
-          <button
-            onClick={() => setActiveSubTab('json')}
-            className={`pb-4 text-[10px] font-black uppercase tracking-widest transition-all relative ${activeSubTab === 'json' ? 'text-luxury-gold' : 'text-gray-500 hover:text-gray-300'}`}
-          >
-            Raw JSON
-            {activeSubTab === 'json' && <motion.div layoutId="subtab-active" className="absolute bottom-0 left-0 right-0 h-0.5 bg-luxury-gold" />}
-          </button>
-        </div>
-
-        <div className="p-8 space-y-8">
-          {activeSubTab === 'overview' ? (
-            <>
-              {/* User Identity Section */}
-              <div className="flex flex-col items-center">
-                <div className="relative mb-4">
-                  <img
-                    src={user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username)}&background=random&color=fff`}
-                    alt={user.username}
-                    className={`w-32 h-32 rounded-3xl object-cover border-4 shadow-xl transition-colors ${isActuallyOnline ? 'border-green-500 shadow-green-500/20' : 'border-gray-500'}`}
-                    referrerPolicy="no-referrer"
-                  />
-                  <div className={`absolute -bottom-2 -right-2 px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest border-2 border-[#0a0a0a] ${isActuallyOnline ? 'bg-green-500 text-white shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-gray-600 text-white'}`}>
-                    {isActuallyOnline ? 'ONLINE' : 'OFFLINE'}
-                  </div>
-                </div>
-                <h1 className="text-2xl font-black text-white">{user.display_name || user.username}</h1>
-                <p className="text-gray-500 font-mono text-sm">UID: {user.id}</p>
-              </div>
-
-              {/* Stats Grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white/5 p-4 rounded-2xl border border-white/5 flex flex-col gap-1">
-                  <div className="flex items-center gap-2 text-gray-500">
-                    <Clock size={12} />
-                    <p className="text-[10px] uppercase font-black tracking-widest">Dernière activité</p>
-                  </div>
-                  <p className="text-sm text-gray-200">{user.last_seen ? new Date(user.last_seen).toLocaleString() : 'Jamais'}</p>
-                </div>
-                <div className="bg-white/5 p-4 rounded-2xl border border-white/5 flex flex-col gap-1">
-                  <div className="flex items-center gap-2 text-gray-500">
-                    <Calendar size={12} />
-                    <p className="text-[10px] uppercase font-black tracking-widest">Inscription</p>
-                  </div>
-                  <p className="text-sm text-gray-200">{user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Inconnue'}</p>
-                </div>
-                <div className="bg-white/5 p-4 rounded-2xl border border-white/5 flex flex-col gap-1">
-                  <div className="flex items-center gap-2 text-gray-500">
-                    <ShieldCheck size={12} />
-                    <p className="text-[10px] uppercase font-black tracking-widest">Rôle</p>
-                  </div>
-                  <p className="text-sm text-luxury-gold font-bold uppercase tracking-widest">{user.role}</p>
-                </div>
-                <div className="bg-white/5 p-4 rounded-2xl border border-white/5 flex flex-col gap-1">
-                  <div className="flex items-center gap-2 text-gray-500">
-                    <Activity size={12} />
-                    <p className="text-[10px] uppercase font-black tracking-widest">Sanctions</p>
-                  </div>
-                  <p className="text-sm text-yellow-500 font-bold">{user.warnings || 0} Avertis.</p>
-                </div>
-              </div>
-
-              {/* Discord Section */}
-              <div className="bg-white/5 p-4 rounded-2xl border border-white/5 flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest">Discord ID</p>
-                  <p className="text-sm text-indigo-400 font-mono">{user.provider_id || 'Non lié'}</p>
-                </div>
-                {user.provider_id && (
-                  <button onClick={() => { navigator.clipboard.writeText(user.provider_id!); showToast('ID Copié !'); }} className="p-2 hover:bg-white/10 rounded-lg transition-all text-gray-400 hover:text-white">
-                    <Copy size={16} />
-                  </button>
-                )}
-              </div>
-
-              {/* Admin Notes Area */}
+            {/* Left Sidebar */}
+            <div className="w-64 bg-black/40 border-r border-white/10 p-8 flex flex-col gap-10">
               <div className="space-y-2">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Notes Administrateur</label>
-                <textarea
-                  value={localNotes}
-                  onChange={(e) => setLocalNotes(e.target.value)}
-                  onBlur={() => onUpdateNotes(user.id, localNotes)}
-                  placeholder="Écrivez des notes sur ce joueur..."
-                  className="w-full h-32 bg-white/5 border border-white/10 rounded-2xl p-4 text-sm text-gray-300 focus:border-luxury-gold transition-all outline-none resize-none"
-                />
-              </div>
-
-              {/* Actions Menu */}
-              <div className="space-y-4">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Actions de Modération</label>
-                <div className="grid grid-cols-1 gap-3">
-                  <div className="flex gap-3">
-                    {user.banned ? (
-                      <button onClick={() => onUnban(user)} className="flex-1 bg-green-500/10 hover:bg-green-500/20 text-green-500 py-3 rounded-xl font-bold uppercase text-[10px] transition-all flex items-center justify-center gap-2 border border-green-500/20">
-                        <ShieldCheck size={16} /> Débannir
-                      </button>
-                    ) : (
-                      <button onClick={() => onBan(user)} className="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-500 py-3 rounded-xl font-bold uppercase text-[10px] transition-all flex items-center justify-center gap-2 border border-red-500/20">
-                        <Activity size={16} /> Bannir
-                      </button>
-                    )}
-                    <button onClick={() => onWarn(user)} className="flex-1 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 py-3 rounded-xl font-bold uppercase text-[10px] transition-all flex items-center justify-center gap-2 border border-yellow-500/20">
-                      <Settings size={16} /> Warn
-                    </button>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => onMessage && onMessage(user)}
-                      className="flex-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 py-3 rounded-xl font-bold uppercase text-[10px] transition-all flex items-center justify-center gap-2 border border-blue-500/10"
-                    >
-                      <Send size={16} /> Message
-                    </button>
-                    {hasGPS && (
-                      <button
-                        onClick={() => {
-                          window.open(`https://www.google.com/maps?q=${user.latitude},${user.longitude}`, '_blank');
-                        }}
-                        className="flex-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 py-3 rounded-xl font-bold uppercase text-[10px] transition-all flex items-center justify-center gap-2 border border-cyan-500/10">
-                        <Activity size={16} /> Voir GPS
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="flex gap-3">
-                    {user.role === 'admin' ? (
-                      <button onClick={() => onRemoveAdmin(user)} className="flex-1 bg-gray-500/10 hover:bg-gray-500/20 text-gray-400 py-3 rounded-xl font-bold uppercase text-[10px] transition-all flex items-center justify-center gap-2 border border-white/5">
-                        Retirer Admin
-                      </button>
-                    ) : (
-                      <button onClick={() => onPromote(user)} className="flex-1 bg-luxury-gold/10 hover:bg-luxury-gold/20 text-luxury-gold py-3 rounded-xl font-bold uppercase text-[10px] transition-all flex items-center justify-center gap-2 border border-luxury-gold/20">
-                        Promouvoir Admin
-                      </button>
-                    )}
-                  </div>
-
-                  <button onClick={() => onDelete(user)} className="w-full bg-red-600/10 hover:bg-red-600/20 text-red-600 py-3 rounded-xl font-bold uppercase text-[10px] transition-all flex items-center justify-center gap-2 border border-red-600/20">
-                    <Trash2 size={16} /> Supprimer Définitivement
-                  </button>
+                <div className="flex items-center gap-3">
+                  <div className={`w-3 h-3 rounded-full ${isActuallyOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-600'}`} />
+                  <h2 className="text-xl font-black text-white uppercase tracking-tighter truncate">{user.display_name || user.username}</h2>
                 </div>
+                <p className="text-[10px] text-gray-500 font-mono opacity-50">UID: {user.id.slice(0, 16)}...</p>
               </div>
-            </>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Données Brutes (Auth.Users)</label>
+
+              <nav className="flex flex-col gap-2">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center gap-4 px-4 py-4 rounded-xl transition-all font-bold text-xs uppercase tracking-widest ${activeTab === tab.id
+                      ? 'bg-luxury-gold text-black shadow-lg shadow-luxury-gold/20'
+                      : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                      }`}
+                  >
+                    {tab.icon}
+                    {tab.label}
+                  </button>
+                ))}
+              </nav>
+
+              <div className="mt-auto">
                 <button
-                  onClick={() => { navigator.clipboard.writeText(JSON.stringify(rawAuthData, null, 2)); showToast('JSON Copié !'); }}
-                  className="flex items-center gap-2 text-[10px] font-black text-luxury-gold hover:text-white transition-all uppercase"
+                  onClick={onClose}
+                  className="w-full flex items-center justify-center gap-2 py-4 rounded-xl border border-white/5 text-gray-500 hover:text-white hover:bg-white/5 transition-all font-bold text-[10px] uppercase tracking-widest"
                 >
-                  <Copy size={12} /> Copier
+                  <X size={16} /> Fermer
                 </button>
               </div>
-              {loadingAuth ? (
-                <div className="flex items-center justify-center p-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-luxury-gold"></div>
-                </div>
-              ) : (
-                <div className="bg-black/50 border border-white/10 rounded-2xl p-6 font-mono text-[11px] text-green-400 overflow-x-auto whitespace-pre max-h-[400px]">
-                  {JSON.stringify(rawAuthData, null, 2)}
-                </div>
-              )}
+            </div>
 
-              <div className="p-4 bg-luxury-gold/5 border border-luxury-gold/20 rounded-xl">
-                <p className="text-[10px] text-luxury-gold leading-relaxed">
-                  <span className="font-black">Note :</span> Ces données proviennent directement de la table <b>auth.users</b> de Supabase. Elles incluent les métadonnées Discord complètes (avatar original, full name) et les informations de session internes.
-                </p>
+            {/* Right Content Area */}
+            <div className="flex-1 flex flex-col bg-[#0d0d0d]">
+              <div className="p-8 border-b border-white/5 flex items-center justify-between bg-black/20">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-xl bg-luxury-gold/10 text-luxury-gold">
+                    {tabs.find(t => t.id === activeTab)?.icon}
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-white uppercase tracking-[0.3em]">
+                      {tabs.find(t => t.id === activeTab)?.label}
+                    </h3>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-0.5">Player Management System</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-10 custom-scrollbar">
+
+                {activeTab === 'actions' && (
+                  <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="space-y-4">
+                      <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">Modération Rapide</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        {user.banned ? (
+                          <button onClick={() => onUnban(user)} className="flex items-center gap-3 px-6 py-4 rounded-2xl bg-green-500/10 hover:bg-green-500/20 text-green-500 border border-green-500/20 transition-all font-bold text-xs uppercase tracking-widest">
+                            <ShieldCheck size={18} /> Débannir
+                          </button>
+                        ) : (
+                          <button onClick={() => onBan(user)} className="flex items-center gap-3 px-6 py-4 rounded-2xl bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 transition-all font-bold text-xs uppercase tracking-widest">
+                            <Activity size={18} /> Bannir
+                          </button>
+                        )}
+                        <button onClick={() => onWarn(user)} className="flex items-center gap-3 px-6 py-4 rounded-2xl bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 border border-yellow-500/20 transition-all font-bold text-xs uppercase tracking-widest">
+                          <Settings size={18} /> Avertissement
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">Communication</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <button onClick={() => onMessage?.(user)} className="flex items-center gap-3 px-6 py-4 rounded-2xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 transition-all font-bold text-xs uppercase tracking-widest">
+                          <Send size={18} /> Message Privé
+                        </button>
+                        {hasGPS && (
+                          <button onClick={() => window.open(`https://www.google.com/maps?q=${user.latitude},${user.longitude}`, '_blank')} className="flex items-center gap-3 px-6 py-4 rounded-2xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 transition-all font-bold text-xs uppercase tracking-widest">
+                            <Activity size={18} /> Localisation
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {currentRole === 'admin' && (
+                      <div className="space-y-4">
+                        <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">Permissions & Système</h4>
+                        <div className="grid grid-cols-2 gap-4">
+                          {user.role === 'user' ? (
+                            <>
+                              <button onClick={() => onPromote(user, 'staff')} className="px-6 py-4 rounded-2xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 transition-all font-bold text-xs uppercase tracking-widest">Staff</button>
+                              <button onClick={() => onPromote(user, 'admin')} className="px-6 py-4 rounded-2xl bg-luxury-gold/10 hover:bg-luxury-gold/20 text-luxury-gold border border-luxury-gold/20 transition-all font-bold text-xs uppercase tracking-widest">Admin</button>
+                            </>
+                          ) : (
+                            <button onClick={() => onRemoveAdmin(user)} className="col-span-2 px-6 py-4 rounded-2xl bg-white/5 hover:bg-white/10 text-gray-400 border border-white/10 transition-all font-bold text-xs uppercase tracking-widest">Rétrograder en Utilisateur</button>
+                          )}
+                          <button onClick={() => onDelete(user)} className="col-span-2 px-6 py-4 rounded-2xl bg-red-600/10 hover:bg-red-600/20 text-red-600 border border-red-600/20 transition-all font-bold text-xs uppercase tracking-widest">Supprimer le Profil</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === 'info' && (
+                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="flex items-center gap-8 p-6 bg-white/5 rounded-[2rem] border border-white/5">
+                      <img
+                        src={user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.username)}&background=random&color=fff`}
+                        alt={user.username}
+                        className="w-24 h-24 rounded-3xl object-cover border-2 border-white/10"
+                      />
+                      <div>
+                        <h4 className="text-xl font-black text-white">{user.display_name || user.username}</h4>
+                        <p className="text-xs text-luxury-gold font-bold uppercase tracking-widest mt-1">{user.role}</p>
+                        <div className="flex items-center gap-4 mt-4">
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-black ${isActuallyOnline ? 'bg-green-500/20 text-green-500' : 'bg-gray-500/20 text-gray-500'}`}>
+                            {isActuallyOnline ? 'EN LIGNE' : 'HORS LIGNE'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-1">
+                        <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest">Dernière Connexion</p>
+                        <p className="text-sm text-gray-200">{user.last_seen ? new Date(user.last_seen).toLocaleString() : 'Jamais'}</p>
+                      </div>
+                      <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-1">
+                        <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest">Membre depuis</p>
+                        <p className="text-sm text-gray-200">{user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Inconnue'}</p>
+                      </div>
+                      <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-1">
+                        <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest">ID Discord</p>
+                        <div className="flex items-center gap-2 group">
+                          <p className="text-sm text-gray-200 font-mono truncate">{user.provider_id || 'Non lié'}</p>
+                          {user.provider_id && (
+                            <button
+                              onClick={() => navigator.clipboard.writeText(user.provider_id!)}
+                              className="text-gray-500 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
+                              title="Copier"
+                            >
+                              <Copy size={12} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="p-6 bg-white/5 rounded-3xl border border-white/5 space-y-1">
+                        <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest">ID Utilisateur (Site)</p>
+                        <div className="flex items-center gap-2 group">
+                          <p className="text-sm text-gray-200 font-mono truncate" title={user.id}>{user.id}</p>
+                          <button
+                            onClick={() => navigator.clipboard.writeText(user.id)}
+                            className="text-gray-500 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
+                            title="Copier"
+                          >
+                            <Copy size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'notes' && (
+                  <div className="h-full flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <textarea
+                      value={localNotes}
+                      onChange={(e) => setLocalNotes(e.target.value)}
+                      onBlur={() => onUpdateNotes(user.id, localNotes)}
+                      placeholder="Notez ici les informations importantes sur ce joueur..."
+                      className="flex-1 bg-white/5 border border-white/10 rounded-[2rem] p-8 text-sm text-gray-300 focus:border-luxury-gold transition-all outline-none resize-none custom-scrollbar shadow-inner"
+                    />
+                    <div className="p-4 bg-luxury-gold/5 border border-luxury-gold/10 rounded-2xl flex items-center gap-3">
+                      <FileText className="text-luxury-gold" size={16} />
+                      <p className="text-[10px] text-luxury-gold font-bold uppercase tracking-widest">Auto-save activé sur perte de focus</p>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'json' && (
+                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">Metadata (Auth.Users)</h4>
+                      <button onClick={() => { navigator.clipboard.writeText(JSON.stringify(rawAuthData, null, 2)); showToast('JSON Copié !'); }} className="flex items-center gap-2 text-[10px] font-black text-luxury-gold hover:text-white transition-all uppercase px-4 py-2 bg-luxury-gold/10 rounded-lg">
+                        <Copy size={12} /> Copier
+                      </button>
+                    </div>
+                    {loadingAuth ? (
+                      <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-luxury-gold"></div></div>
+                    ) : (
+                      <pre className="bg-black/50 border border-white/5 rounded-[2rem] p-8 font-mono text-[11px] text-green-400 overflow-x-auto custom-scrollbar max-h-[400px]">
+                        {JSON.stringify(rawAuthData, null, 2)}
+                      </pre>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
-          )}
+          </motion.div>
         </div>
-      </motion.div>
-    </>
+      )}
+    </AnimatePresence>
   );
 };
+
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
@@ -498,10 +517,22 @@ const Admin: React.FC = () => {
 
   // Global notifications (broadcast)
   const [globalNotifs, setGlobalNotifs] = useState<any[]>([]);
-  const [notifLoading, setNotifLoading] = useState(false);
-  const [newNotifContent, setNewNotifContent] = useState('');
-  const [newNotifImage, setNewNotifImage] = useState('');
   const [notifSubmitting, setNotifSubmitting] = useState(false);
+
+  // Admin Toast state
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+  };
+
+  // Toast Auto-clear
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -723,24 +754,27 @@ const Admin: React.FC = () => {
     if (data) setPosts(data);
   };
 
-  const promoteAdmin = async (userId: string) => {
+  const promoteUser = async (userId: string, targetRole: 'admin' | 'staff') => {
     // Récupérer le nom d'utilisateur pour le log
     const user = users.find(u => u.id === userId);
     const username = user?.username || 'Unknown';
 
-    // Confirm removed
-    /* if (!window.true || confirm(`Voulez-vous vraiment promouvoir ${username} en Administrateur ?`)) return; */
-
     const { error } = await supabase
       .from('profiles')
-      .update({ role: 'admin' })
+      .update({ role: targetRole })
       .eq('id', userId);
 
     if (!error) {
+      showToast(`✅ Utilisateur promu en ${targetRole} !`);
       // Log l'action
-      await logAdminAction('promote_admin', `⬆️ Promotion de ${username} en administrateur`, 'user', username);
+      await logAdminAction('promote_user', `⬆️ Promotion de ${username} en ${targetRole}`, 'user', username);
       fetchUsers();
+      // Mettre à jour l'utilisateur sélectionné pour rafraîchir le SidePanel
+      if (selectedUser?.id === userId) {
+        setSelectedUser({ ...user, role: targetRole });
+      }
     } else {
+      showToast(`❌ Erreur: ${error.message}`);
       console.log(`Erreur: ${error.message}`);
     }
   };
@@ -2155,28 +2189,32 @@ const Admin: React.FC = () => {
             >
               <Users size={16} /> Utilisateurs
             </button>
-            <button
-              onClick={() => setActiveTab('posts')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'posts' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
-            >
-              <FilePlus size={16} /> Posts
-            </button>
+            {profile?.role === 'admin' && (
+              <button
+                onClick={() => setActiveTab('posts')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'posts' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
+              >
+                <FilePlus size={16} /> Posts
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('rules')}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'rules' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
             >
               <BookOpen size={16} /> Règles
             </button>
-            <button
-              onClick={() => {
-                setActiveTab('config');
-                fetchAdminTeam();
-                fetchGlobalNotifications();
-              }}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'config' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
-            >
-              <Settings size={16} /> Config
-            </button>
+            {profile?.role === 'admin' && (
+              <button
+                onClick={() => {
+                  setActiveTab('config');
+                  fetchAdminTeam();
+                  fetchGlobalNotifications();
+                }}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'config' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
+              >
+                <Settings size={16} /> Config
+              </button>
+            )}
             <button
               onClick={() => {
                 setActiveTab('logs');
@@ -2195,34 +2233,40 @@ const Admin: React.FC = () => {
             >
               <Ticket size={16} /> Tickets
             </button>
-            <button
-              onClick={() => {
-                setActiveTab('music');
-                fetchMusicSettings();
-              }}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'music' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
-            >
-              <Music size={16} /> Musique
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab('chat');
-                fetchChatSettings();
-              }}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'chat' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
-            >
-              <MessageSquare size={16} /> Chat
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab('shop');
-                fetchProducts();
-                fetchProductCategories();
-              }}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'shop' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
-            >
-              <ShoppingBag size={16} /> Shop
-            </button>
+            {profile?.role === 'admin' && (
+              <button
+                onClick={() => {
+                  setActiveTab('music');
+                  fetchMusicSettings();
+                }}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'music' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
+              >
+                <Music size={16} /> Musique
+              </button>
+            )}
+            {profile?.role === 'admin' && (
+              <button
+                onClick={() => {
+                  setActiveTab('chat');
+                  fetchChatSettings();
+                }}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'chat' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
+              >
+                <MessageSquare size={16} /> Chat
+              </button>
+            )}
+            {profile?.role === 'admin' && (
+              <button
+                onClick={() => {
+                  setActiveTab('shop');
+                  fetchProducts();
+                  fetchProductCategories();
+                }}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'shop' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
+              >
+                <ShoppingBag size={16} /> Shop
+              </button>
+            )}
           </div>
         </header>
 
@@ -2365,8 +2409,9 @@ const Admin: React.FC = () => {
             })()}
 
             {/* Panneau latéral de détails */}
-            <UserSidePanel
+            <PlayerDetailsModal
               user={selectedUser}
+              currentRole={profile?.role}
               isOpen={isSidePanelOpen}
               onClose={() => setIsSidePanelOpen(false)}
               onBan={(u) => {
@@ -2381,9 +2426,9 @@ const Admin: React.FC = () => {
                   deleteUser(u.id, u.username);
                 }
               }}
-              onPromote={(u) => {
+              onPromote={(u, role) => {
                 if (true) {
-                  promoteAdmin(u.id);
+                  promoteUser(u.id, role);
                 }
               }}
               onRemoveAdmin={(u) => {
@@ -4074,6 +4119,13 @@ const Admin: React.FC = () => {
               </div>
             </div>
           </motion.div>
+        )}
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
         )}
       </div>
     </motion.div>

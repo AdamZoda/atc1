@@ -290,7 +290,7 @@ const AppContent = () => {
               />
               <Route
                 path="/admin"
-                element={(profile && profile.role === 'admin') ? <Admin /> : <Navigate to="/" />}
+                element={(profile && (profile.role === 'admin' || profile.role === 'staff')) ? <Admin /> : <Navigate to="/" />}
               />
 
               <Route path="/profile" element={session ? <ProfilePage /> : <Navigate to="/login" />} />
