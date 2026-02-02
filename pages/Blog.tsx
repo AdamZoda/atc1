@@ -102,7 +102,12 @@ const Blog: React.FC = () => {
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
-            if (data) setPosts(data);
+
+            // If not admin, filter to only show published posts
+            if (data) {
+                const filteredData = isAdmin ? data : data.filter((p: any) => p.status === 'published');
+                setPosts(filteredData);
+            }
         } catch (err: any) {
             console.error('Error fetching blogs:', err);
             setToast({ message: `Erreur chargement: ${err.message}`, type: 'error' });
@@ -407,7 +412,9 @@ const Blog: React.FC = () => {
                                 {isAdmin && (
                                     <button onClick={(e) => deletePost(post.id, e)} className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all" title="Supprimer"><Trash2 size={20} /></button>
                                 )}
-                                <button onClick={() => handleEditPost(post)} className="p-2 text-gray-500 hover:text-white hover:bg-white/5 rounded-lg transition-all" title="Éditer"><MoreHorizontal size={20} /></button>
+                                {isAdmin && (
+                                    <button onClick={() => handleEditPost(post)} className="p-2 text-gray-500 hover:text-white hover:bg-white/5 rounded-lg transition-all" title="Éditer"><MoreHorizontal size={20} /></button>
+                                )}
                             </div>
                         </div>
                     ))}
