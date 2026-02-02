@@ -55,6 +55,14 @@ const Blog: React.FC = () => {
         }
     }, [slug]);
 
+    // Toast Auto-clear
+    useEffect(() => {
+        if (toast) {
+            const timer = setTimeout(() => setToast(null), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [toast]);
+
     const fetchPostBySlug = async (postSlug: string) => {
         try {
             const { data, error } = await supabase
@@ -242,6 +250,11 @@ const Blog: React.FC = () => {
                 <article className="max-w-3xl mx-auto px-6 py-12">
                     <div dangerouslySetInnerHTML={{ __html: currentPost.content || '' }} className="prose prose-invert prose-lg max-w-none prose-headings:font-cinzel prose-a:text-[#c5a059] prose-img:rounded-xl prose-img:shadow-lg" />
                 </article>
+                {toast && (
+                    <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 px-8 py-4 rounded-xl shadow-2xl text-white font-bold backdrop-blur-xl border border-white/10 animate-fade-in-up z-50 ${toast.type === 'error' ? 'bg-red-500/90' : 'bg-[#c5a059]/90 !text-black'}`}>
+                        {toast.message}
+                    </div>
+                )}
             </div>
         );
     }
@@ -380,6 +393,17 @@ const Blog: React.FC = () => {
                             <div className="col-span-2 text-sm text-gray-400 font-medium">{post.profiles?.display_name}</div>
                             <div className="col-span-2 text-xs text-gray-500">{format(new Date(post.created_at), 'dd/MM/yyyy', { locale: fr })}</div>
                             <div className="col-span-2 flex justify-end gap-3 pr-2">
+                                <button
+                                    onClick={() => {
+                                        const url = `${window.location.origin}/#/blog/${post.slug}`;
+                                        navigator.clipboard.writeText(url);
+                                        setToast({ message: 'Lien copié !', type: 'success' });
+                                    }}
+                                    className="p-2 text-gray-500 hover:text-[#c5a059] hover:bg-[#c5a059]/10 rounded-lg transition-all"
+                                    title="Copier le lien"
+                                >
+                                    <Share2 size={20} />
+                                </button>
                                 <button onClick={() => { setCurrentPost(post); setView('read'); }} className="p-2 text-gray-500 hover:text-[#c5a059] hover:bg-[#c5a059]/10 rounded-lg transition-all" title="Voir l'aperçu"><Eye size={20} /></button>
                                 {isAdmin && (
                                     <button onClick={(e) => deletePost(post.id, e)} className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all" title="Supprimer"><Trash2 size={20} /></button>
@@ -390,6 +414,11 @@ const Blog: React.FC = () => {
                     ))}
                     {posts.length === 0 && <div className="p-20 text-center text-gray-600 font-cinzel tracking-widest uppercase">Le journal est encore vierge.</div>}
                 </div>
+                {toast && (
+                    <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 px-8 py-4 rounded-xl shadow-2xl text-white font-bold backdrop-blur-xl border border-white/10 animate-fade-in-up z-50 ${toast.type === 'error' ? 'bg-red-500/90' : 'bg-[#c5a059]/90 !text-black'}`}>
+                        {toast.message}
+                    </div>
+                )}
             </div>
         </div>
     );
