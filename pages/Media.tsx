@@ -4,8 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../supabaseClient';
 import { Post, Comment } from '../types';
-import { Play, Image as ImageIcon, FileText, Calendar, AlertCircle, Send, Trash2, ChevronLeft, ChevronRight, Layers } from 'lucide-react';
+import { Play, Image as ImageIcon, FileText, Calendar, AlertCircle, Send, Trash2, ChevronLeft, ChevronRight, Layers, Heart } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
+import { toast } from 'sonner';
 import AccessControl from '../components/AccessControl';
 
 const Media: React.FC = () => {
@@ -60,13 +61,105 @@ const MediaContent: React.FC = () => {
   }, [selectedPost]);
 
   const fetchPosts = async () => {
-    const { data, error } = await supabase
-      .from('posts')
-      .select('*')
-      .order('created_at', { ascending: false });
+    try {
+      const { data: postsData, error } = await supabase
+        .from('posts')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    if (data) setPosts(data);
-    setLoading(false);
+      if (error) throw error;
+
+      if (postsData) {
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+        // Fetch user's likes
+        let likedPostIds = new Set();
+        if (currentSession) {
+          const { data: likesData, error: likesError } = await supabase
+            .from('post_likes')
+            .select('post_id')
+            .eq('user_id', currentSession.user.id);
+
+          if (!likesError) {
+            likedPostIds = new Set(likesData?.map(l => l.post_id) || []);
+          }
+        }
+
+        // Fetch global like counts
+        const { data: allLikes, error: allLikesError } = await supabase
+          .from('post_likes')
+          .select('post_id');
+
+        const countsMap: Record<number, number> = {};
+        if (!allLikesError && allLikes) {
+          allLikes.forEach(l => {
+            countsMap[l.post_id] = (countsMap[l.post_id] || 0) + 1;
+          });
+        }
+
+        setPosts(postsData.map(post => ({
+          ...post,
+          likes_count: countsMap[post.id] || 0,
+          is_liked_by_me: likedPostIds.has(post.id)
+        })));
+      }
+    } catch (err) {
+      console.error("Error fetching gallery posts:", err);
+      toast.error("Impossible de charger la galerie");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleLike = async (postId: number) => {
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+    if (!currentSession) {
+      toast.error("Veuillez vous connecter pour aimer cet article");
+      return;
+    }
+
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+
+    if (post.is_liked_by_me) {
+      const { error } = await supabase
+        .from('post_likes')
+        .delete()
+        .match({ user_id: currentSession.user.id, post_id: postId });
+
+      if (!error) {
+        const update = (p: Post) => p.id === postId
+          ? { ...p, is_liked_by_me: false, likes_count: Math.max(0, (p.likes_count || 1) - 1) }
+          : p;
+
+        setPosts(prev => prev.map(update));
+        if (selectedPost?.id === postId) {
+          setSelectedPost(prev => prev ? update(prev) : null);
+        }
+      } else {
+        console.error("Error unliking:", error);
+        toast.error("Échec de la suppression du like");
+      }
+    } else {
+      const { error } = await supabase
+        .from('post_likes')
+        .insert({ user_id: currentSession.user.id, post_id: postId });
+
+      if (!error) {
+        const update = (p: Post) => p.id === postId
+          ? { ...p, is_liked_by_me: true, likes_count: (p.likes_count || 0) + 1 }
+          : p;
+
+        setPosts(prev => prev.map(update));
+        if (selectedPost?.id === postId) {
+          setSelectedPost(prev => prev ? update(prev) : null);
+        }
+        toast.success("Aimé ! ❤️");
+      } else {
+        console.error("Error liking:", error);
+        toast.error("Échec du like (vérifiez votre connexion)");
+      }
+    }
   };
 
   const handleVideoError = (postId: number) => {
@@ -234,9 +327,26 @@ const MediaContent: React.FC = () => {
                     )}
                   </div>
 
-                  <div className="p-4">
-                    <h3 className="text-sm font-cinzel font-bold text-white truncate">{post.title}</h3>
-                    <p className="text-gray-500 text-xs mt-1 line-clamp-1">{post.content}</p>
+                  <div className="p-4 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-cinzel font-bold text-white truncate">{post.title}</h3>
+                      <p className="text-gray-500 text-[10px] mt-0.5 line-clamp-1">{post.content}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-gray-400">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleLike(post.id);
+                        }}
+                        className="p-2 hover:bg-white/5 rounded-full transition-colors group/heart-btn"
+                      >
+                        <Heart
+                          size={16}
+                          className={`${post.is_liked_by_me ? 'fill-red-500 text-red-500' : 'group-hover/heart-btn:text-red-400/70'} transition-all`}
+                        />
+                      </button>
+                      <span className="text-[10px] font-bold">{post.likes_count || 0}</span>
+                    </div>
                   </div>
                 </motion.div>
               ))}
@@ -363,7 +473,20 @@ const MediaContent: React.FC = () => {
                         </button>
                       </div>
                       <h2 className="text-xl font-cinzel font-bold text-white mb-2 leading-tight">{selectedPost.title}</h2>
-                      <p className="text-gray-400 text-xs leading-relaxed line-clamp-3 hover:line-clamp-none transition-all duration-500">{selectedPost.content}</p>
+                      <p className="text-gray-400 text-xs leading-relaxed line-clamp-3 hover:line-clamp-none transition-all duration-500 mb-6">{selectedPost.content}</p>
+
+                      {/* Like Action in Modal */}
+                      <button
+                        onClick={() => toggleLike(selectedPost.id)}
+                        className={`flex items-center gap-3 px-6 py-3 rounded-xl border transition-all w-full justify-center ${selectedPost.is_liked_by_me
+                          ? 'bg-red-500/10 border-red-500 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.2)]'
+                          : 'bg-white/5 border-white/10 text-gray-400 hover:border-white/30'}`}
+                      >
+                        <Heart size={20} className={selectedPost.is_liked_by_me ? 'fill-red-500' : ''} />
+                        <span className="font-bold uppercase tracking-widest text-sm">
+                          {selectedPost.likes_count || 0} Likes
+                        </span>
+                      </button>
                     </div>
 
                     {/* Comments Section */}

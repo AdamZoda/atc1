@@ -5,7 +5,7 @@ import { supabase } from '../supabaseClient';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '../LanguageContext';
-import { AlertCircle, Search, X, ChevronLeft, ChevronRight, Copy, Check } from 'lucide-react';
+import { AlertCircle, Search, X, ChevronLeft, ChevronRight, Copy, Check, Heart, HeartOff, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import AccessControl from '../components/AccessControl';
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -25,6 +25,8 @@ interface Product {
   sale_price?: number | null;
   images: string[] | null;
   youtube_url: string | null;
+  is_favorite?: boolean;
+  favorites_count?: number;
 }
 
 const getYouTubeId = (url: string) => {
@@ -44,6 +46,7 @@ const Shop: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
+  const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -57,22 +60,91 @@ const Shop: React.FC = () => {
       return;
     }
 
-    const { data, error } = await supabase
+    // Fetch products
+    const { data: productsData, error } = await supabase
       .from('products')
       .select('id, name, model_name, description, price, image_url, images, youtube_url, category, created_at, featured, stock, on_sale, sale_price')
       .order('created_at', { ascending: false });
 
-    if (!error && data) {
-      setProducts(data.map(product => ({
+    if (!error && productsData) {
+      // Fetch user's favorites
+      const { data: favoritesData } = await supabase
+        .from('product_favorites')
+        .select('product_id')
+        .eq('user_id', session.user.id);
+
+      const favoriteIds = new Set(favoritesData?.map(f => f.product_id) || []);
+
+      // Fetch global favorite counts
+      const { data: countsData } = await supabase
+        .from('product_favorites')
+        .select('product_id');
+
+      const countsMap: Record<string, number> = {};
+      countsData?.forEach(f => {
+        countsMap[f.product_id] = (countsMap[f.product_id] || 0) + 1;
+      });
+
+      setProducts(productsData.map(product => ({
         ...product,
         category: typeof product.category === 'string' ? product.category : null,
         stock: typeof product.stock === 'number' ? product.stock : 0,
         on_sale: !!product.on_sale,
         sale_price: product.sale_price !== undefined && product.sale_price !== null ? Number(product.sale_price) : null,
         images: product.images || (product.image_url ? [product.image_url] : []),
+        is_favorite: favoriteIds.has(product.id),
+        favorites_count: countsMap[product.id] || 0,
       })));
     }
     setLoading(false);
+  };
+
+  const toggleFavorite = async (productId: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast.error("Veuillez vous connecter pour ajouter des favoris");
+      return;
+    }
+
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    if (product.is_favorite) {
+      // Remove favorite
+      const { error } = await supabase
+        .from('product_favorites')
+        .delete()
+        .match({ user_id: session.user.id, product_id: productId });
+
+      if (!error) {
+        setProducts(prev => prev.map(p =>
+          p.id === productId
+            ? { ...p, is_favorite: false, favorites_count: Math.max(0, (p.favorites_count || 1) - 1) }
+            : p
+        ));
+        toast.info("Retiré des favoris");
+      } else {
+        console.error("Error removing favorite:", error);
+        toast.error("Échec de la suppression");
+      }
+    } else {
+      // Add favorite
+      const { error } = await supabase
+        .from('product_favorites')
+        .insert({ user_id: session.user.id, product_id: productId });
+
+      if (!error) {
+        setProducts(prev => prev.map(p =>
+          p.id === productId
+            ? { ...p, is_favorite: true, favorites_count: (p.favorites_count || 0) + 1 }
+            : p
+        ));
+        toast.success("Ajouté aux favoris ! ❤️");
+      } else {
+        console.error("Error adding favorite:", error);
+        toast.error("Échec de l'ajout aux favoris");
+      }
+    }
   };
 
   // Extraction des catégories uniques
@@ -86,7 +158,8 @@ const Shop: React.FC = () => {
       product.name.toLowerCase().includes(query) ||
       (product.description ? product.description.toLowerCase().includes(query) : false);
     const matchCategory = !category || product.category === category;
-    return matchSearch && matchCategory;
+    const matchFavorite = !showOnlyFavorites || product.is_favorite;
+    return matchSearch && matchCategory && matchFavorite;
   });
 
   const featuredProducts = filteredProducts.filter(p => p.featured);
@@ -132,6 +205,16 @@ const Shop: React.FC = () => {
               <option key={cat!} value={cat!}>{cat}</option>
             ))}
           </select>
+
+          <button
+            onClick={() => setShowOnlyFavorites(!showOnlyFavorites)}
+            className={`flex items-center gap-2 px-6 py-2 rounded-lg border transition-all ${showOnlyFavorites
+              ? 'bg-luxury-gold/20 border-luxury-gold text-luxury-gold shadow-[0_0_15px_rgba(197,160,89,0.3)]'
+              : 'bg-black/50 border-white/10 text-gray-400 hover:border-white/30'}`}
+          >
+            <Heart size={18} className={showOnlyFavorites ? 'fill-luxury-gold' : ''} />
+            <span className="text-sm font-bold uppercase tracking-widest">Favoris</span>
+          </button>
         </div>
 
         {loading ? (
@@ -155,7 +238,7 @@ const Shop: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {featuredProducts.map((product) => (
-                    <ProductCard key={product.id} product={product} />
+                    <ProductCard key={product.id} product={product} onToggleFavorite={toggleFavorite} />
                   ))}
                 </div>
               </section>
@@ -171,7 +254,7 @@ const Shop: React.FC = () => {
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {(featuredProducts.length > 0 ? regularProducts : filteredProducts).map((product) => (
-                  <ProductCard key={product.id} product={product} />
+                  <ProductCard key={product.id} product={product} onToggleFavorite={toggleFavorite} />
                 ))}
               </div>
             </section>
@@ -182,7 +265,7 @@ const Shop: React.FC = () => {
   );
 };
 
-const ProductCard: React.FC<{ product: Product }> = ({ product }) => {
+const ProductCard: React.FC<{ product: Product, onToggleFavorite: (id: string) => void }> = ({ product, onToggleFavorite }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -283,6 +366,24 @@ const ProductCard: React.FC<{ product: Product }> = ({ product }) => {
                   </span>
                 )}
               </div>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleFavorite(product.id);
+                }}
+                className="absolute top-2 left-2 p-2 bg-black/40 backdrop-blur-md border border-white/10 rounded-full text-white hover:text-red-500 transition-all z-10 group/heart"
+              >
+                <div className="flex flex-col items-center">
+                  <Heart
+                    size={18}
+                    className={`${product.is_favorite ? 'fill-red-500 text-red-500' : 'text-white/70 group-hover/heart:text-red-500'} transition-colors`}
+                  />
+                  {product.favorites_count && product.favorites_count > 0 ? (
+                    <span className="text-[8px] font-bold mt-0.5">{product.favorites_count}</span>
+                  ) : null}
+                </div>
+              </button>
             </div>
 
             <CardContent className="p-5 flex-grow">
@@ -418,6 +519,26 @@ const ProductCard: React.FC<{ product: Product }> = ({ product }) => {
                     {product.category}
                   </span>
                 )}
+              </div>
+
+              {/* Stats Bar */}
+              <div className="flex gap-4 mb-6 pb-6 border-b border-white/5">
+                <button
+                  onClick={() => onToggleFavorite(product.id)}
+                  className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg hover:border-red-500 transition-all group/modal-heart"
+                >
+                  <Heart
+                    size={20}
+                    className={`${product.is_favorite ? 'fill-red-500 text-red-500' : 'text-gray-400 group-hover/modal-heart:text-red-500'}`}
+                  />
+                  <span className={`text-sm font-bold ${product.is_favorite ? 'text-red-500' : 'text-gray-400'}`}>
+                    {product.favorites_count || 0} Favoris
+                  </span>
+                </button>
+                <div className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-gray-400">
+                  <Star size={20} className="text-luxury-gold" />
+                  <span className="text-sm font-bold">Produit Premium</span>
+                </div>
               </div>
 
               {product.model_name && (

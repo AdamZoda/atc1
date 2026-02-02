@@ -27,6 +27,8 @@ export interface Post {
   media_type: 'image' | 'video' | 'file';
   created_at: string;
   created_by?: string;
+  likes_count?: number;
+  is_liked_by_me?: boolean;
 }
 
 export interface Comment {
