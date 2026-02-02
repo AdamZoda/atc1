@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        /* DEFAULT TO DARK MODE LUXURY THEME */
+        --background: 0 0% 2%;
+        /* #050505 */
+        --foreground: 0 0% 100%;
+        /* #ffffff */
+
+        --card: 0 0% 2%;
+        /* #050505 same as bg or slightly lighter */
+        --card-foreground: 0 0% 100%;
+
+        --popover: 0 0% 2%;
+        --popover-foreground: 0 0% 100%;
+
+        --primary: 46 65% 52%;
+        /* #D4AF37 Gold */
+        --primary-foreground: 0 0% 0%;
+
+        --secondary: 46 65% 52%;
+        /* Gold as secondary */
+        --secondary-foreground: 0 0% 0%;
+
+        --muted: 0 0% 10%;
+        --muted-foreground: 0 0% 60%;
+
+        --accent: 46 65% 52%;
+        --accent-foreground: 0 0% 0%;
+
+        --destructive: 0 100% 50%;
+        --destructive-foreground: 0 0% 100%;
+
+        --border: 0 0% 20%;
+        --input: 0 0% 20%;
+        --ring: 46 65% 52%;
+        /* Gold Ring */
+
+        --radius: 0.5rem;
+    }
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+
+    body {
+        @apply bg-background text-foreground;
+    }
+}

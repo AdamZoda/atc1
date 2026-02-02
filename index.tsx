@@ -2,6 +2,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './src/responsive.css';
+import './src/index.css';
 import App from './App';
 
 // Nettoyage global de la console pour la confidentialité et le professionnalisme

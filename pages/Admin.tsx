@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../supabaseClient';
 import { Profile, Post, RuleCategory, Rule } from '../types';
-import { Users, FilePlus, ShieldCheck, Trash2, Upload, Send, LayoutDashboard, Settings, Video, Image as ImageIcon, BookOpen, History, Activity, Ticket, Music, Play, Pause, Copy, Check, Clock, Calendar, X, RefreshCcw, MessageSquare } from 'lucide-react';
+import { Users, FilePlus, ShieldCheck, Trash2, Upload, Send, LayoutDashboard, Settings, Video, Image as ImageIcon, BookOpen, History, Activity, Ticket, Music, Play, Pause, Copy, Check, Clock, Calendar, X, RefreshCcw, MessageSquare, ShoppingBag, Package } from 'lucide-react';
+import ProductForm from '../components/ProductForm';
 import { useLanguage } from '../LanguageContext';
 import LocationDisplay from '../components/LocationDisplay';
 
@@ -381,7 +382,7 @@ const UserSidePanel: React.FC<{
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'posts' | 'config' | 'rules' | 'logs' | 'tickets' | 'music' | 'chat'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'posts' | 'config' | 'rules' | 'logs' | 'tickets' | 'music' | 'chat' | 'shop'>('users');
   const [users, setUsers] = useState<Profile[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [categories, setCategories] = useState<RuleCategory[]>([]);
@@ -489,6 +490,11 @@ const Admin: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadTimeRemaining, setUploadTimeRemaining] = useState<string>('');
 
+  // Shop state
+  const [products, setProducts] = useState<any[]>([]);
+  const [isProductFormOpen, setIsProductFormOpen] = useState(false);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [productCategories, setProductCategories] = useState<any[]>([]);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -521,6 +527,8 @@ const Admin: React.FC = () => {
       fetchMusicSettings();
       fetchMusicHistory();
       fetchChatSettings();
+      fetchProducts();
+      fetchProductCategories();
 
       // Realtime subscription for users
       const channel = supabase
@@ -1995,6 +2003,53 @@ const Admin: React.FC = () => {
     }
   };
 
+  // SHOP FUNCTIONS
+  const fetchProducts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setProducts(data || []);
+    } catch (error: any) {
+      console.error('Error fetching products:', error);
+    }
+  };
+
+  const fetchProductCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setProductCategories(data || []);
+    } catch (error: any) {
+      console.error('Error fetching categories:', error);
+    }
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productId);
+
+      if (error) throw error;
+
+      await logAdminAction('delete_product', '🗑️ Suppression produit', 'product', productId);
+      fetchProducts();
+    } catch (error: any) {
+      alert('Erreur: ' + error.message);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -2075,6 +2130,16 @@ const Admin: React.FC = () => {
               className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'chat' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
             >
               <MessageSquare size={16} /> Chat
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('shop');
+                fetchProducts();
+                fetchProductCategories();
+              }}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'shop' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
+            >
+              <ShoppingBag size={16} /> Shop
             </button>
           </div>
         </header>
@@ -3637,6 +3702,95 @@ const Admin: React.FC = () => {
               )}
             </div>
           </motion.div>
+        )}
+        {activeTab === 'shop' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-3xl font-bold text-luxury-gold">🛍️ Gestion Boutique</h2>
+              <button
+                onClick={() => {
+                  setEditingProductId(null);
+                  setIsProductFormOpen(true);
+                }}
+                className="px-6 py-3 bg-luxury-gold text-black font-bold uppercase tracking-widest rounded-xl hover:bg-luxury-goldLight transition-all flex items-center gap-2"
+              >
+                <Package size={20} /> Ajouter Produit
+              </button>
+            </div>
+
+            {isProductFormOpen ? (
+              <div className="glass p-8 rounded-[3rem] border border-white/5">
+                <div className="mb-6 flex items-center justify-between">
+                  <h3 className="text-xl font-cinzel font-bold text-white uppercase tracking-widest">
+                    {editingProductId ? 'Modifier le Produit' : 'Nouveau Produit'}
+                  </h3>
+                  <button
+                    onClick={() => setIsProductFormOpen(false)}
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+                <ProductForm
+                  productId={editingProductId || undefined}
+                  onSuccess={() => {
+                    setIsProductFormOpen(false);
+                    fetchProducts();
+                  }}
+                  onCancel={() => setIsProductFormOpen(false)}
+                />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {products.map((product) => (
+                  <div key={product.id} className="glass p-5 rounded-2xl border border-white/5 hover:border-luxury-gold/30 transition-all group">
+                    <div className="aspect-square bg-black/50 rounded-xl overflow-hidden mb-4 relative">
+                      <img
+                        src={product.image_url}
+                        alt={product.name}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      />
+                      {product.on_sale && (
+                        <div className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">
+                          Promo
+                        </div>
+                      )}
+                      {product.stock === 0 && (
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                          <span className="text-white font-bold uppercase tracking-widest border border-white px-3 py-1">Épuisé</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mb-4">
+                      <h4 className="font-bold text-white mb-1 truncate">{product.name}</h4>
+                      <p className="text-luxury-gold text-lg font-cinzel font-bold">
+                        {product.on_sale ? product.sale_price : product.price} $
+                      </p>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingProductId(product.id);
+                          setIsProductFormOpen(true);
+                        }}
+                        className="flex-1 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-xs font-bold uppercase transition-all"
+                      >
+                        Modifier
+                      </button>
+                      <button
+                        onClick={() => handleDeleteProduct(product.id)}
+                        className="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
         {activeTab === 'chat' && (
           <motion.div
