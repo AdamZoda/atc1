@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../supabaseClient';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
@@ -38,6 +39,7 @@ const getYouTubeThumbnail = (id: string) => `https://img.youtube.com/vi/${id}/ma
 
 const Shop: React.FC = () => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -48,6 +50,13 @@ const Shop: React.FC = () => {
   }, []);
 
   const fetchProducts = async () => {
+    // Check authentication first
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      navigate('/login');
+      return;
+    }
+
     const { data, error } = await supabase
       .from('products')
       .select('id, name, model_name, description, price, image_url, images, youtube_url, category, created_at, featured, stock, on_sale, sale_price')
