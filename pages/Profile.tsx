@@ -506,39 +506,27 @@ const ProfilePage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Location Section */}
-                <div className="p-6 rounded-2xl bg-black/40 border border-white/10">
-                  <div className="flex items-center gap-3 mb-6">
-                    <MapPin size={24} className="text-luxury-gold" />
-                    <h2 className="text-lg font-cinzel font-bold text-white uppercase tracking-wider">Vérification de Compte</h2>
-                  </div>
-
-                  {latitude && longitude ? (
-                    <div className="flex flex-col md:flex-row items-center gap-4">
-                      <div className="flex-1 text-sm text-green-400 flex items-center gap-2">
-                        <Check size={18} /> Position enregistrée : {latitude.toFixed(4)}, {longitude.toFixed(4)}
-                      </div>
-                      <button
-                        onClick={handleRequestLocation}
-                        disabled={requestingLocation}
-                        className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all text-xs font-black uppercase tracking-widest disabled:opacity-50"
-                      >
-                        {requestingLocation ? <RefreshCcw className="animate-spin" size={16} /> : 'Mettre à jour'}
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4 text-center py-4">
-                      <p className="text-sm text-gray-400">Vérifiez votre compte pour permettre aux admins de vous localiser en jeu.</p>
-                      <button
-                        onClick={handleRequestLocation}
-                        disabled={requestingLocation}
-                        className="px-10 py-4 rounded-xl bg-luxury-gold text-black font-black uppercase tracking-widest hover:bg-luxury-goldLight transition-all disabled:opacity-50 flex items-center justify-center gap-2 mx-auto"
-                      >
+                {/* Simplified Location Verification */}
+                <div className="flex justify-center pt-2">
+                  <button
+                    onClick={handleRequestLocation}
+                    disabled={requestingLocation}
+                    className={`px-10 py-4 rounded-xl font-black uppercase tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2 border ${latitude && longitude
+                      ? 'bg-green-500/10 text-green-400 border-green-500/30'
+                      : 'bg-luxury-gold text-black border-luxury-gold hover:scale-105 shadow-lg shadow-luxury-gold/20'}`}
+                  >
+                    {latitude && longitude ? (
+                      <>
+                        <Check size={18} />
+                        {requestingLocation ? <RefreshCcw className="animate-spin" size={18} /> : 'Compte Vérifié'}
+                      </>
+                    ) : (
+                      <>
                         <Navigation size={18} />
-                        {requestingLocation ? 'Localisation...' : 'Vérifier mon compte'}
-                      </button>
-                    </div>
-                  )}
+                        {requestingLocation ? <RefreshCcw className="animate-spin" size={18} /> : 'Vérifier mon compte'}
+                      </>
+                    )}
+                  </button>
                 </div>
 
                 <div className="flex gap-4 pt-4">
