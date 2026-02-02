@@ -5,7 +5,7 @@ import RichTextEditor from '../components/Blog/RichTextEditor';
 import {
     ArrowLeft, Save, Eye, Settings, Calendar,
     Globe, Layout, Tag, MapPin, ChevronDown, Check,
-    MoreHorizontal, Image as ImageIcon, User, Clock
+    MoreHorizontal, Image as ImageIcon, User, Clock, Plus, Trash2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -57,18 +57,24 @@ const Blog: React.FC = () => {
     };
 
     const fetchPosts = async () => {
-        const { data } = await supabase
-            .from('blog_posts')
-            .select(`*, profiles(display_name)`)
-            .order('created_at', { ascending: false });
+        try {
+            const { data, error } = await supabase
+                .from('blog_posts')
+                .select(`*, profiles(display_name)`)
+                .order('created_at', { ascending: false });
 
-        if (data) setPosts(data);
+            if (error) throw error;
+            if (data) setPosts(data);
+        } catch (err: any) {
+            console.error('Error fetching blogs:', err);
+            setToast({ message: `Erreur chargement: ${err.message}`, type: 'error' });
+        }
     };
 
     // Auto-save
     useEffect(() => {
         if (view !== 'editor' || !currentPost.title) return;
-        const timer = setTimeout(() => savePost(true), 3000);
+        const timer = setTimeout(() => savePost(true), 10000); // 10s for auto-save
         return () => clearTimeout(timer);
     }, [currentPost.title, editorContent]);
 
@@ -81,6 +87,8 @@ const Blog: React.FC = () => {
         setIsAutoSaving(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('Utilisateur non connecté');
+
             const slug = currentPost.slug || generateSlug(currentPost.title || 'untitled');
 
             const tempDiv = document.createElement('div');
@@ -94,31 +102,62 @@ const Blog: React.FC = () => {
                 content: editorContent,
                 excerpt,
                 status: manualStatus || currentPost.status || 'draft',
-                author_id: user?.id,
+                author_id: user.id,
                 updated_at: new Date().toISOString()
             };
 
+            console.log('Saving post data:', postData);
+
+            let result;
             if (currentPost.id) {
-                const { data } = await supabase.from('blog_posts').update(postData).eq('id', currentPost.id).select().single();
-                if (data) setCurrentPost(data);
+                result = await supabase.from('blog_posts').update(postData).eq('id', currentPost.id).select().single();
             } else {
-                const { data } = await supabase.from('blog_posts').insert(postData).select().single();
-                if (data) setCurrentPost(data);
+                result = await supabase.from('blog_posts').insert(postData).select().single();
+
+                // Handle duplicate slug error on NEW post
+                if (result.error && result.error.code === '23505' && result.error.message.includes('blog_posts_slug_key')) {
+                    console.log('Slug collision detected, retrying with suffix...');
+                    const uniqueSlug = `${slug}-${Math.random().toString(36).substring(2, 7)}`;
+                    postData.slug = uniqueSlug;
+                    result = await supabase.from('blog_posts').insert(postData).select().single();
+                }
             }
 
-            if (!isAutoSave) {
-                const isPublished = (manualStatus === 'published' || currentPost.status === 'published');
-                setToast({
-                    message: isPublished ? 'Article publié avec succès !' : 'Brouillon enregistré !',
-                    type: 'success'
-                });
+            if (result.error) throw result.error;
+
+            if (result.data) {
+                setCurrentPost(result.data);
+                if (!isAutoSave) {
+                    const isPublished = (manualStatus === 'published' || result.data.status === 'published');
+                    setToast({
+                        message: isPublished ? 'Article publié avec succès !' : 'Enregistré avec succès !',
+                        type: 'success'
+                    });
+                    setTimeout(() => fetchPosts(), 500);
+                }
             }
-        } catch (e) {
-            console.error(e);
-            setToast({ message: 'Erreur lors de l\'enregistrement', type: 'error' });
+        } catch (e: any) {
+            console.error('Save error:', e);
+            let errorMsg = 'Problème lors de l\'enregistrement';
+            if (e.code === '23505') errorMsg = 'Ce titre est déjà utilisé (slug existant).';
+            setToast({ message: `Erreur: ${errorMsg}`, type: 'error' });
         } finally {
             setIsAutoSaving(false);
-            if (!isAutoSave) fetchPosts();
+        }
+    };
+
+    const deletePost = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!window.confirm('Voulez-vous vraiment supprimer cet article ?')) return;
+
+        try {
+            const { error } = await supabase.from('blog_posts').delete().eq('id', id);
+            if (error) throw error;
+            setToast({ message: 'Article supprimé', type: 'success' });
+            fetchPosts();
+        } catch (err: any) {
+            console.error('Delete error:', err);
+            setToast({ message: `Erreur suppression: ${err.message}`, type: 'error' });
         }
     };
 
@@ -259,7 +298,7 @@ const Blog: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen bg-[#0a0a0a] text-white p-8 pt-24 font-sans">
+        <div className="min-h-screen bg-[#0a0a0a] text-white p-8 pt-32 md:pt-40 font-sans">
             <div className="max-w-6xl mx-auto">
                 <div className="flex items-center justify-between mb-12">
                     <div>
@@ -296,8 +335,11 @@ const Blog: React.FC = () => {
                             <div className="col-span-2 text-sm text-gray-400 font-medium">{post.profiles?.display_name}</div>
                             <div className="col-span-2 text-xs text-gray-500">{format(new Date(post.created_at), 'dd/MM/yyyy', { locale: fr })}</div>
                             <div className="col-span-2 flex justify-end gap-3 pr-2">
-                                <button onClick={() => { setCurrentPost(post); setView('read'); }} className="p-2 text-gray-500 hover:text-[#c5a059] hover:bg-[#c5a059]/10 rounded-lg transition-all"><Eye size={20} /></button>
-                                <button onClick={() => handleEditPost(post)} className="p-2 text-gray-500 hover:text-white hover:bg-white/5 rounded-lg transition-all"><MoreHorizontal size={20} /></button>
+                                <button onClick={() => { setCurrentPost(post); setView('read'); }} className="p-2 text-gray-500 hover:text-[#c5a059] hover:bg-[#c5a059]/10 rounded-lg transition-all" title="Voir l'aperçu"><Eye size={20} /></button>
+                                {isAdmin && (
+                                    <button onClick={(e) => deletePost(post.id, e)} className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all" title="Supprimer"><Trash2 size={20} /></button>
+                                )}
+                                <button onClick={() => handleEditPost(post)} className="p-2 text-gray-500 hover:text-white hover:bg-white/5 rounded-lg transition-all" title="Éditer"><MoreHorizontal size={20} /></button>
                             </div>
                         </div>
                     ))}
@@ -307,8 +349,5 @@ const Blog: React.FC = () => {
         </div>
     );
 };
-
-// Re-importing missing Icon
-import { Plus } from 'lucide-react';
 
 export default Blog;
