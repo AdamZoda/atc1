@@ -45,6 +45,10 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.href = '/#/';
+    window.location.reload();
   };
 
   useEffect(() => {

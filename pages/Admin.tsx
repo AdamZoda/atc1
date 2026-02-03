@@ -777,7 +777,6 @@ const Admin: React.FC = () => {
         setSelectedUser({ ...user, role: targetRole });
       }
     } else {
-      showToast(`❌ Erreur: ${error.message}`);
       console.log(`Erreur: ${error.message}`);
     }
   };
@@ -1017,31 +1016,55 @@ const Admin: React.FC = () => {
     }
   };
 
-  // Supprimer un utilisateur
+  // Supprimer un utilisateur (COMPTE + PROFIL)
   const deleteUser = async (userId: string, username: string) => {
-    // Confirm removed
-    /* if (!window.true || confirm(`⚠️ ATTENTION: Voulez-vous vraiment SUPPRIMER DÉFINITIVEMENT le compte de ${username} ? Cette action est irréversible.`)) return; */
-    const { error } = await supabase
-      .from('profiles')
-      .delete()
-      .eq('id', userId);
-    if (!error) {
-      // Log l'action (avant de potentiellement se déconnecter)
-      await logAdminAction('delete_user', `🗑️ Suppression de l'utilisateur ${username}`, 'user', username);
+    /* 
+       Note: Pour que cela fonctionne, vous DEVEZ avoir exécuté le script SQL 'setup_complete_deletion.sql' dans Supabase !
+       Sinon, cela échouera avec une erreur "function not found".
+    */
 
-      // Si l'utilisateur supprimé est l'utilisateur courant, déconnexion immédiate
+    // Attempt to use the secure RPC first (Total Deletion)
+    try {
+      const { error } = await supabase.rpc('delete_user_completely', { user_id: userId });
+
+      if (error) {
+        console.error("RPC delete_user_completely failed:", error);
+        throw error; // Fallback or handle error
+      }
+
+      // Success
+      await logAdminAction('delete_user', `🗑️ Suppression TOTALE du compte de ${username}`, 'user', username);
+      showToast(`✅ Compte de ${username} supprimé définitivement (Auth + Profil).`);
+
+      // 1. Force logout if self-deletion
       const currentSession = await supabase.auth.getSession();
-      const currentUserId = currentSession?.data?.session?.user?.id;
-      if (currentUserId && currentUserId === userId) {
+      if (currentSession?.data?.session?.user?.id === userId) {
         await supabase.auth.signOut();
         window.location.href = '/';
-      } else {
-        fetchUsers();
+        return;
       }
-    } else {
-      showToast(`❌ Erreur: ${error.message}`);
+
+      // 2. Refresh list
+      fetchUsers();
+
+    } catch (err: any) {
+      console.error("Deletion error:", err);
+
+      // Fallback: Si la RPC n'existe pas, on fait l'ancienne méthode (Profil uniquement) 
+      // et on prévient l'admin qu'il doit configurer la DB.
+      if (err.message?.includes('function') && err.message?.includes('does not exist')) {
+        showToast("⚠️ SQL manquant : Suppression partielle (Profil uniquement). Exécutez 'setup_complete_deletion.sql' !", 'error');
+
+        const { error: fallbackError } = await supabase.from('profiles').delete().eq('id', userId);
+        if (!fallbackError) {
+          fetchUsers();
+        }
+      } else {
+        showToast(`❌ Erreur suppression : ${err.message}`, 'error');
+      }
     }
   };
+
 
   const handleGlobalSync = async () => {
     // Confirm removed

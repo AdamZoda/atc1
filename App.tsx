@@ -201,6 +201,14 @@ const AppContent = () => {
       if (data.banned) {
         console.warn('⛔ UTILISATEUR BANNI - ÉCRAN DE BANNISSEMENT');
       }
+    } else {
+      // SI SESSION EXISTE MAIS PAS DE PROFIL (User supprimé par admin)
+      console.warn('⚠️ Session active mais profil introuvable (possible suppression). Déconnexion forcée...');
+      await supabase.auth.signOut();
+      localStorage.clear();
+      sessionStorage.clear();
+      setSession(null);
+      setProfile(null);
     }
     setLoading(false);
   };
