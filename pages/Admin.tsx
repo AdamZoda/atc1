@@ -518,6 +518,9 @@ const Admin: React.FC = () => {
   // Global notifications (broadcast)
   const [globalNotifs, setGlobalNotifs] = useState<any[]>([]);
   const [notifSubmitting, setNotifSubmitting] = useState(false);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [newNotifContent, setNewNotifContent] = useState('');
+  const [newNotifImage, setNewNotifImage] = useState('');
 
   // Admin Toast state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
