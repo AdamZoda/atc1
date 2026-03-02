@@ -32,6 +32,7 @@ import LocationPermission from './components/LocationPermission';
 import ConfigError from './components/ConfigError';
 import MusicPlayer from './components/MusicPlayer';
 import BannedScreen from './components/BannedScreen';
+import FloatingBanner from './components/FloatingBanner';
 
 const AppContent = () => {
   // Check if Supabase is properly configured
@@ -313,6 +314,7 @@ const AppContent = () => {
         </main>
         <Footer />
         <MusicPlayer />
+        <FloatingBanner />
       </div>
     </div>
   );

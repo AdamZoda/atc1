@@ -522,6 +522,11 @@ const Admin: React.FC = () => {
   const [newNotifContent, setNewNotifContent] = useState('');
   const [newNotifImage, setNewNotifImage] = useState('');
 
+  // Ad Configuration state
+  const [adEnabled, setAdEnabled] = useState(false);
+  const [adScriptUrl, setAdScriptUrl] = useState('');
+  const [adSubmitting, setAdSubmitting] = useState(false);
+
   // Admin Toast state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -570,6 +575,7 @@ const Admin: React.FC = () => {
       fetchChatSettings();
       fetchProducts();
       fetchProductCategories();
+      fetchAdConfig();
 
       // Realtime subscription for users
       const channel = supabase
@@ -1789,6 +1795,48 @@ const Admin: React.FC = () => {
       console.error('Error fetching global notifs:', error);
     } finally {
       setNotifLoading(false);
+    }
+  };
+
+  const fetchAdConfig = async () => {
+    try {
+      const { data: enabledData } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'ad_enabled')
+        .single();
+      if (enabledData) setAdEnabled(enabledData.value === 'true');
+
+      const { data: urlData } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'ad_script_url')
+        .single();
+      if (urlData) setAdScriptUrl(urlData.value);
+    } catch (error) {
+      console.error('Error fetching ad config:', error);
+    }
+  };
+
+  const handleUpdateAdConfig = async () => {
+    setAdSubmitting(true);
+    try {
+      const { error: enabledError } = await supabase
+        .from('settings')
+        .upsert({ key: 'ad_enabled', value: adEnabled ? 'true' : 'false', type: 'image' }, { onConflict: 'key' });
+
+      const { error: urlError } = await supabase
+        .from('settings')
+        .upsert({ key: 'ad_script_url', value: adScriptUrl, type: 'image' }, { onConflict: 'key' });
+
+      if (enabledError || urlError) throw (enabledError || urlError);
+
+      showToast('✅ Configuration de l\'annonce mise à jour !');
+      await logAdminAction('update_ad_config', `📢 Mise à jour de la configuration de l'annonce (${adEnabled ? 'Activée' : 'Désactivée'})`, 'config', 'ads');
+    } catch (error: any) {
+      showToast('❌ Erreur: ' + error.message, 'error');
+    } finally {
+      setAdSubmitting(false);
     }
   };
 
@@ -3251,6 +3299,67 @@ const Admin: React.FC = () => {
         {/* PROFILE PERMISSIONS SECTION */}
         {activeTab === 'config' && (
           <div className="space-y-6">
+            {/* Advertising Configuration Section */}
+            <div className="glass p-8 rounded-2xl border border-white/5">
+              <div className="text-center mb-8">
+                <div className="w-12 h-12 bg-luxury-gold/10 rounded-xl flex items-center justify-center mx-auto mb-4 text-luxury-gold">
+                  <LayoutDashboard size={24} />
+                </div>
+                <h3 className="text-xl font-cinzel font-bold uppercase tracking-widest">📢 Configuration Publicité</h3>
+                <p className="text-gray-500 text-xs mt-1">Gérez l'affichage de la bannière publicitaire flottante</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Script URL</label>
+                    <input
+                      type="text"
+                      value={adScriptUrl}
+                      onChange={(e) => setAdScriptUrl(e.target.value)}
+                      placeholder="https://pl28825110.effectivegatecpm.com/..."
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:border-luxury-gold transition-all outline-none"
+                    />
+                    <p className="text-[10px] text-gray-500 mt-2">
+                      L'URL du script JS fourni par votre régie publicitaire.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between p-5 glass rounded-2xl border border-white/5">
+                    <div>
+                      <p className="text-sm font-bold text-white mb-1">Activer l'Annonce</p>
+                      <p className="text-[10px] text-gray-400">Si activé, l'annonce sera injectée sur toutes les pages (sauf admin).</p>
+                    </div>
+                    <button
+                      onClick={() => setAdEnabled(!adEnabled)}
+                      className={`w-14 h-7 rounded-full relative transition-all duration-300 ${adEnabled ? 'bg-luxury-gold' : 'bg-white/10'}`}
+                    >
+                      <div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all duration-300 ${adEnabled ? 'left-8' : 'left-1'}`} />
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={handleUpdateAdConfig}
+                    disabled={adSubmitting}
+                    className="w-full py-4 bg-luxury-gold text-black font-black uppercase tracking-widest rounded-xl hover:bg-luxury-goldLight transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {adSubmitting ? <RefreshCcw className="animate-spin" size={18} /> : <Check size={18} />}
+                    Enregistrer la Configuration
+                  </button>
+                </div>
+
+                <div className="bg-yellow-500/5 border border-yellow-600/20 rounded-2xl p-6">
+                  <h4 className="text-xs font-black text-yellow-500 uppercase tracking-widest mb-3">💡 Informations</h4>
+                  <ul className="text-[11px] text-gray-400 space-y-2 list-disc pl-4">
+                    <li>L'annonce s'affichera de manière flottante selon les paramètres du script.</li>
+                    <li>Elle est automatiquement masquée sur les pages d'administration pour votre confort.</li>
+                    <li>Les modifications sont appliquées en temps réel pour tous les visiteurs.</li>
+                    <li>Assurez-vous que l'URL commence bien par <code className="text-luxury-gold">https://</code>.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
             {/* Global Notifications Section */}
             <div className="glass p-8 rounded-2xl border border-white/5">
               <div className="text-center mb-8">
