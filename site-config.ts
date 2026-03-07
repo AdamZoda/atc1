@@ -3,10 +3,10 @@ export const siteConfig = {
   server: {
     name: "Atlantic RP",
     ip: "45.8.187.146",
-    cfxId: "", // Laissez vide si vous n'avez pas d'ID Cfx.re valide pour éviter les erreurs 404
+    cfxId: "r7k5l7", // Added CFX ID to enable Real-Time player count on Home page
     connectUrl: "fivem://connect/45.8.187.146",
     playersOnline: 124,
-    maxPlayers: 250,
+    maxPlayers: 300,
   },
   links: {
     discord: "https://discord.com/invite/atlantic-roleplay-492135997342220318",
