@@ -5,11 +5,11 @@ import { supabase } from '../supabaseClient';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '../LanguageContext';
-import { AlertCircle, Search, X, ChevronLeft, ChevronRight, Copy, Check, Heart, HeartOff, Star } from 'lucide-react';
+import { AlertCircle, Search, X, ChevronLeft, ChevronRight, Copy, Check, Heart, HeartOff, Star, Package, ShoppingBag } from 'lucide-react';
 import { toast } from 'sonner';
 import AccessControl from '../components/AccessControl';
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import * as VisuallyHidden from '@radix-ui/react-visually-hidden'; // You might need to install this or create a wrapper if not available, simply using a hidden class works too for accessibility if VisuallyHidden is not present. Actually, for DialogTitle/Description warning, we can just render them. 
+// Accessibility titles for Dialogs are handled with sr-only class
 
 interface Product {
   id: string;
@@ -27,6 +27,9 @@ interface Product {
   youtube_url: string | null;
   is_favorite?: boolean;
   favorites_count?: number;
+  points_price?: number;
+  is_points_enabled?: number;
+  is_money_enabled?: boolean;
 }
 
 const getYouTubeId = (url: string) => {
@@ -47,6 +50,11 @@ const Shop: React.FC = () => {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
+  const [profile, setProfile] = useState<{ id: string, points: number } | null>(null);
+  const [ownedProductIds, setOwnedProductIds] = useState<Set<string>>(new Set());
+  const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [isInventoryLoading, setIsInventoryLoading] = useState(false);
+  const [userInventory, setUserInventory] = useState<any[]>([]);
 
   useEffect(() => {
     fetchProducts();
@@ -60,10 +68,21 @@ const Shop: React.FC = () => {
       return;
     }
 
+    // Fetch profile for points balance
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('id, points')
+      .eq('id', session.user.id)
+      .single();
+
+    if (profileData) {
+      setProfile(profileData);
+    }
+
     // Fetch products
     const { data: productsData, error } = await supabase
       .from('products')
-      .select('id, name, model_name, description, price, image_url, images, youtube_url, category, created_at, featured, stock, on_sale, sale_price')
+      .select('id, name, model_name, description, price, points_price, is_points_enabled, is_money_enabled, image_url, images, youtube_url, category, created_at, featured, stock, on_sale, sale_price')
       .order('created_at', { ascending: false });
 
     if (!error && productsData) {
@@ -90,13 +109,49 @@ const Shop: React.FC = () => {
         category: typeof product.category === 'string' ? product.category : null,
         stock: typeof product.stock === 'number' ? product.stock : 0,
         on_sale: !!product.on_sale,
+        points_price: Number(product.points_price) || 0,
+        is_points_enabled: typeof product.is_points_enabled === 'number' ? product.is_points_enabled : (product.is_points_enabled ? 1 : 0),
         sale_price: product.sale_price !== undefined && product.sale_price !== null ? Number(product.sale_price) : null,
         images: product.images || (product.image_url ? [product.image_url] : []),
         is_favorite: favoriteIds.has(product.id),
         favorites_count: countsMap[product.id] || 0,
       })));
+
+      // Fetch owned products
+      const { data: ownedData } = await supabase
+        .from('user_inventory')
+        .select('product_id')
+        .eq('user_id', session.user.id);
+
+      if (ownedData) {
+        setOwnedProductIds(new Set(ownedData.map(o => o.product_id)));
+      }
     }
     setLoading(false);
+  };
+
+  const fetchUserInventory = async () => {
+    setIsInventoryLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data, error } = await supabase
+        .from('user_inventory')
+        .select(`
+          *,
+          product:products (*)
+        `)
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setUserInventory(data || []);
+    } catch (err) {
+      console.error("Error fetching inventory:", err);
+    } finally {
+      setIsInventoryLoading(false);
+    }
   };
 
   const toggleFavorite = async (productId: string) => {
@@ -176,11 +231,90 @@ const Shop: React.FC = () => {
           </h1>
           <div className="flex items-center justify-center gap-4">
             <div className="h-px w-12 bg-luxury-gold/30 hidden md:block"></div>
-            <p className="text-gray-400 text-sm md:text-lg uppercase tracking-[0.4em] font-light">
-              Exclusivité & Prestige
-            </p>
-            <div className="h-px w-12 bg-luxury-gold/30 hidden md:block"></div>
           </div>
+
+          {profile && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mt-6 flex justify-center items-center gap-4"
+            >
+              <div className="bg-luxury-gold/10 border border-luxury-gold/30 px-6 py-2 rounded-full shadow-[0_0_20px_rgba(212,175,55,0.1)] flex items-center gap-3">
+                <Star size={16} className="text-luxury-gold" />
+                <span className="text-sm font-black uppercase tracking-widest text-white">
+                  Votre Solde : <span className="text-luxury-gold">{profile.points || 0} PTS</span>
+                </span>
+              </div>
+
+              <Dialog open={inventoryOpen} onOpenChange={(open) => {
+                setInventoryOpen(open);
+                if (open) fetchUserInventory();
+              }}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="bg-blue-600/10 border-blue-500/30 text-blue-400 hover:bg-blue-600 hover:text-white rounded-full px-6 py-2 font-black uppercase tracking-widest text-xs flex items-center gap-2 transition-all">
+                    <Package size={16} />
+                    Mon Inventaire
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="bg-black/95 border border-blue-500/20 text-white w-[95vw] max-w-4xl p-0 overflow-hidden rounded-[2rem]">
+                  <div className="sr-only">
+                    <DialogTitle>Mon Inventaire</DialogTitle>
+                    <DialogDescription>Liste de vos objets et véhicules débloqués</DialogDescription>
+                  </div>
+                  <div className="p-8 border-b border-blue-500/10 flex items-center justify-between bg-blue-500/5">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 rounded-xl bg-blue-500/20 text-blue-400">
+                        <Package size={24} />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-black uppercase tracking-[0.2em] font-cinzel">Mon Inventaire</h2>
+                        <p className="text-[10px] text-blue-400/60 uppercase tracking-widest font-bold">Vos objets et véhicules débloqués</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-8 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                    {isInventoryLoading ? (
+                      <div className="flex flex-col items-center justify-center py-20 gap-4">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                        <p className="text-blue-400 text-xs font-bold uppercase tracking-widest">Chargement de vos trésors...</p>
+                      </div>
+                    ) : userInventory.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-16 gap-4 border border-dashed border-white/5 rounded-3xl">
+                        <ShoppingBag size={48} className="text-gray-600" />
+                        <p className="text-gray-500 font-cinzel text-sm uppercase tracking-widest text-center px-8">Vous n'avez pas encore d'objets dans votre inventaire.</p>
+                        <Button variant="link" onClick={() => setInventoryOpen(false)} className="text-luxury-gold uppercase text-xs font-bold">Aller au catalogue →</Button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {userInventory.map((item) => (
+                          <div key={item.id} className="group relative bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-blue-500/30 transition-all">
+                            <div className="flex gap-4 p-4">
+                              <div className="w-24 h-24 rounded-xl overflow-hidden bg-black/40 border border-white/5">
+                                {item.product?.image_url ? (
+                                  <img src={item.product.image_url} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-blue-500/20"><Package size={24} /></div>
+                                )}
+                              </div>
+                              <div className="flex-1 flex flex-col justify-center">
+                                <h4 className="font-bold text-white uppercase tracking-wider">{item.product?.name || "Produit Inconnu"}</h4>
+                                <p className="text-[10px] text-blue-400 font-black uppercase tracking-widest mt-1">Débloqué via Points</p>
+                                <div className="mt-3 flex items-center justify-between">
+                                  <span className="text-[10px] text-gray-500 font-mono">ID: {item.product?.model_name || "N/A"}</span>
+                                  <span className="text-[10px] text-gray-400">Le {new Date(item.created_at).toLocaleDateString()}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </motion.div>
+          )}
         </div>
 
         {/* Filters - Sticky on Mobile/Desktop */}
@@ -238,7 +372,13 @@ const Shop: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {featuredProducts.map((product) => (
-                    <ProductCard key={product.id} product={product} onToggleFavorite={toggleFavorite} />
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      isOwned={ownedProductIds.has(product.id)}
+                      onToggleFavorite={toggleFavorite}
+                      onPurchasePoints={() => { fetchProducts(); }}
+                    />
                   ))}
                 </div>
               </section>
@@ -254,7 +394,13 @@ const Shop: React.FC = () => {
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {(featuredProducts.length > 0 ? regularProducts : filteredProducts).map((product) => (
-                  <ProductCard key={product.id} product={product} onToggleFavorite={toggleFavorite} />
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    isOwned={ownedProductIds.has(product.id)}
+                    onToggleFavorite={toggleFavorite}
+                    onPurchasePoints={() => { fetchProducts(); }}
+                  />
                 ))}
               </div>
             </section>
@@ -265,10 +411,16 @@ const Shop: React.FC = () => {
   );
 };
 
-const ProductCard: React.FC<{ product: Product, onToggleFavorite: (id: string) => void }> = ({ product, onToggleFavorite }) => {
+const ProductCard: React.FC<{
+  product: Product,
+  isOwned?: boolean,
+  onToggleFavorite: (id: string) => void,
+  onPurchasePoints: () => void
+}> = ({ product, isOwned, onToggleFavorite, onPurchasePoints }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [purchasing, setPurchasing] = useState(false);
 
   const rawImages = product.images && product.images.length > 0 ? product.images : (product.image_url ? [product.image_url] : []);
   const youtubeId = product.youtube_url ? getYouTubeId(product.youtube_url) : null;
@@ -310,6 +462,17 @@ const ProductCard: React.FC<{ product: Product, onToggleFavorite: (id: string) =
               setCurrentImageIndex(0); // Optional: reset on leave
             }}
           >
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 flex flex-col gap-1 items-center">
+              {product.is_money_enabled && !product.is_points_enabled && (
+                <span className="text-[8px] font-black uppercase tracking-tighter bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-sm border border-green-500/30 backdrop-blur-md">Paiement Réel</span>
+              )}
+              {product.is_points_enabled && product.is_points_enabled > 0 && !product.is_money_enabled && (
+                <span className="text-[8px] font-black uppercase tracking-tighter bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded-sm border border-blue-500/30 backdrop-blur-md">Points Uniquement</span>
+              )}
+              {product.is_points_enabled && product.is_points_enabled > 0 && product.is_money_enabled && (
+                <span className="text-[8px] font-black uppercase tracking-tighter bg-luxury-gold/20 text-luxury-gold px-1.5 py-0.5 rounded-sm border border-luxury-gold/30 backdrop-blur-md">Points & Réel</span>
+              )}
+            </div>
             <div className="aspect-video overflow-hidden bg-black/50 relative">
               {media.length > 0 ? (
                 <>
@@ -365,6 +528,17 @@ const ProductCard: React.FC<{ product: Product, onToggleFavorite: (id: string) =
                     Promo
                   </span>
                 )}
+                {product.is_points_enabled && product.is_points_enabled > 0 && (
+                  <span className="px-3 py-1 bg-blue-500/80 text-white text-[10px] font-black uppercase tracking-widest rounded-sm shadow-lg flex items-center gap-1 border border-blue-400/30">
+                    {product.points_price} PTS
+                  </span>
+                )}
+                {isOwned && (
+                  <span className="px-3 py-1 bg-green-600 text-white text-[10px] font-black uppercase tracking-widest rounded-sm shadow-lg flex items-center gap-1 border border-green-400/30">
+                    <Check size={10} />
+                    DÉJÀ POSSÉDÉ
+                  </span>
+                )}
               </div>
 
               <button
@@ -408,9 +582,16 @@ const ProductCard: React.FC<{ product: Product, onToggleFavorite: (id: string) =
                       </span>
                     </div>
                   ) : (
-                    <span className="text-xl font-bold text-luxury-gold">
-                      {Number(product.price).toLocaleString('fr-FR')} $
-                    </span>
+                    product.is_money_enabled ? (
+                      <span className="text-xl font-bold text-luxury-gold">
+                        {Number(product.price).toLocaleString('fr-FR')} $
+                      </span>
+                    ) : (
+                      <span className="text-xl font-bold text-blue-400 flex items-center gap-1">
+                        <Star size={18} className="fill-blue-400" />
+                        {product.points_price} PTS
+                      </span>
+                    )
                   )}
                 </div>
                 {product.model_name && (
@@ -439,11 +620,11 @@ const ProductCard: React.FC<{ product: Product, onToggleFavorite: (id: string) =
           </Card>
         </DialogTrigger>
         <DialogContent className="bg-black/95 border border-luxury-gold/20 text-white w-[95vw] max-w-[1800px] h-[90vh] p-0 overflow-hidden rounded-3xl">
-          <VisuallyHidden.Root>
+          <div className="sr-only">
             <DialogTitle>{product.name}</DialogTitle>
             <DialogDescription>Détails du produit</DialogDescription>
-          </VisuallyHidden.Root>
-          <div className="flex flex-col md:grid md:grid-cols-[70%_30%] w-full h-full overflow-y-auto md:overflow-hidden">
+          </div>
+          <div className="flex flex-col md:grid md:grid-cols-[70%_30%] w-full h-full overflow-y-auto">
             {/* Left: Images */}
             <div className="relative h-64 md:h-full bg-black/50 group">
               {media.length > 0 ? (
@@ -511,7 +692,7 @@ const ProductCard: React.FC<{ product: Product, onToggleFavorite: (id: string) =
             </div>
 
             {/* Right: Info */}
-            <div className="p-6 md:p-8 flex flex-col h-full bg-gradient-to-b from-black/80 to-black/40 border-t md:border-t-0 md:border-l border-white/10">
+            <div className="p-6 md:p-8 flex flex-col bg-gradient-to-b from-black/80 to-black/40 border-t md:border-t-0 md:border-l border-white/10">
               <div className="mb-6">
                 <h2 className="text-3xl md:text-4xl font-cinzel font-black text-white mb-2">{product.name}</h2>
                 {product.category && (
@@ -560,7 +741,7 @@ const ProductCard: React.FC<{ product: Product, onToggleFavorite: (id: string) =
                 </div>
               )}
 
-              <div className="flex-1 overflow-y-auto pr-2 mb-8 custom-scrollbar">
+              <div className="pr-2 mb-8">
                 <p className="text-gray-300 leading-relaxed text-lg whitespace-pre-wrap">
                   {product.description || "Aucune description disponible pour ce produit d'exception."}
                 </p>
@@ -569,32 +750,81 @@ const ProductCard: React.FC<{ product: Product, onToggleFavorite: (id: string) =
               <div className="mt-auto space-y-6">
                 <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5">
                   <span className="text-gray-400 uppercase tracking-widest text-sm">Prix</span>
-                  <div className="text-right">
-                    {product.on_sale && product.sale_price ? (
-                      <>
-                        <div className="text-sm text-gray-500 line-through decoration-red-500/50">
-                          {Number(product.price).toLocaleString('fr-FR')} $
+                  <div className="flex flex-col items-end gap-2">
+                    {product.is_money_enabled && (
+                      <div className="text-right">
+                        {product.on_sale && product.sale_price ? (
+                          <>
+                            <div className="text-xs text-gray-500 line-through decoration-red-500/50">
+                              {Number(product.price).toLocaleString('fr-FR')} $
+                            </div>
+                            <div className="text-3xl font-bold text-red-500">
+                              {Number(product.sale_price).toLocaleString('fr-FR')} $
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-3xl font-bold text-luxury-gold">
+                            {Number(product.price).toLocaleString('fr-FR')} $
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {product.is_points_enabled && product.is_points_enabled > 0 && product.is_money_enabled && (
+                      <div className="h-px w-full bg-white/5 my-1"></div>
+                    )}
+                    {product.is_points_enabled && product.is_points_enabled > 0 && (
+                      <div className="text-right">
+                        <div className="text-sm text-blue-400/60 uppercase tracking-widest">Prix en Points</div>
+                        <div className="text-3xl font-black text-blue-400 flex items-center gap-2 justify-end">
+                          <Star size={24} className="fill-blue-400" />
+                          {product.points_price} PTS
                         </div>
-                        <div className="text-3xl font-bold text-red-500">
-                          {Number(product.sale_price).toLocaleString('fr-FR')} $
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-3xl font-bold text-luxury-gold">
-                        {Number(product.price).toLocaleString('fr-FR')} $
                       </div>
                     )}
                   </div>
                 </div>
 
-                <a
-                  href="https://discord.gg/pNsJ3RzDv2"
-                  target="_blank"
-                  rel="noreferrer"
-                  className={`w-full bg-luxury-gold hover:bg-luxury-goldLight text-black font-black uppercase tracking-[0.2em] py-6 text-lg rounded-xl shadow-[0_0_20px_rgba(212,175,55,0.3)] hover:shadow-[0_0_30px_rgba(212,175,55,0.5)] transition-all flex items-center justify-center ${product.stock === 0 ? 'opacity-50 pointer-events-none' : ''}`}
-                >
-                  {product.stock === 0 ? 'Indisponible' : 'Acheter maintenant'}
-                </a>
+                <div className="grid grid-cols-1 gap-4">
+                  {product.is_points_enabled && product.is_points_enabled > 0 && (
+                    <Button
+                      disabled={purchasing || (product.stock === 0 && !isOwned) || isOwned}
+                      onClick={async () => {
+                        if (isOwned) return;
+                        setPurchasing(true);
+                        try {
+                          const { data, error } = await supabase.rpc('purchase_product_with_points', {
+                            p_product_id: product.id
+                          });
+
+                          if (error) throw error;
+                          if (data.success) {
+                            toast.success(`Succès ! ${data.message}`);
+                            onPurchasePoints();
+                          }
+                        } catch (err: any) {
+                          toast.error(err.message || "Erreur lors de l'achat");
+                        } finally {
+                          setPurchasing(false);
+                        }
+                      }}
+                      className={`w-full ${isOwned ? 'bg-green-600 hover:bg-green-600' : 'bg-blue-600 hover:bg-blue-500'} text-white font-black uppercase tracking-[0.2em] py-8 text-xl rounded-xl shadow-[0_0_20px_rgba(37,99,235,0.3)] transition-all flex items-center justify-center gap-3 disabled:opacity-50`}
+                    >
+                      {isOwned ? <Check size={24} /> : <Star size={24} className="fill-white" />}
+                      {isOwned ? 'DÉJÀ POSSÉDÉ' : purchasing ? 'Traitement...' : 'Acheter avec Points'}
+                    </Button>
+                  )}
+
+                  {product.is_money_enabled && (
+                    <a
+                      href="https://discord.gg/pNsJ3RzDv2"
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`w-full bg-luxury-gold hover:bg-luxury-goldLight text-black font-black uppercase tracking-[0.2em] py-6 text-lg rounded-xl shadow-[0_0_20px_rgba(212,175,55,0.3)] hover:shadow-[0_0_30px_rgba(212,175,55,0.5)] transition-all flex items-center justify-center ${product.stock === 0 ? 'opacity-50 pointer-events-none' : ''}`}
+                    >
+                      {product.stock === 0 ? 'Indisponible' : 'Acheter avec $ (Discord)'}
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
           </div>

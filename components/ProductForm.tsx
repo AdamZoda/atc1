@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Star } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -13,7 +14,8 @@ const productSchema = z.object({
     name: z.string().trim().min(1, { message: 'Name is required' }),
     model_name: z.string().optional(),
     description: z.string().max(1000).optional(),
-    price: z.number().positive(),
+    price: z.number().min(0),
+    points_price: z.number().int().min(0).optional(),
     image_url: z.string().url().optional().or(z.literal('')),
     youtube_url: z.string().url().optional().or(z.literal('')),
 });
@@ -42,6 +44,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId, onSuccess, onCance
         on_sale: false,
         sale_price: '',
         images: [] as string[],
+        points_price: 0,
+        is_points_enabled: 0,
+        is_money_enabled: true,
     });
     const [categories, setCategories] = useState<string[]>([]);
 
@@ -90,6 +95,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId, onSuccess, onCance
                 on_sale: !!data.on_sale,
                 sale_price: data.sale_price ? data.sale_price.toString() : '',
                 images: data.images || [],
+                points_price: typeof data.points_price === 'number' ? data.points_price : Number(data.points_price) || 0,
+                is_points_enabled: typeof data.is_points_enabled === 'number' ? data.is_points_enabled : (data.is_points_enabled === true ? 1 : 0),
+                is_money_enabled: data.is_money_enabled !== false, // default to true
             });
         }
     };
@@ -124,6 +132,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId, onSuccess, onCance
             on_sale: !!formData.on_sale,
             sale_price: formData.on_sale && formData.sale_price ? Number(formData.sale_price) : null,
             images: formData.images.length > 0 ? formData.images : (formData.image_url ? [formData.image_url] : []),
+            points_price: parseInt(formData.points_price.toString()) || 0,
+            is_points_enabled: parseInt(formData.is_points_enabled.toString()) || 0,
+            is_money_enabled: formData.is_money_enabled,
         };
 
         if (isEditing && productId) {
@@ -233,7 +244,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId, onSuccess, onCance
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="price" className="text-gray-300">Prix ($) *</Label>
+                        <Label htmlFor="price" className="text-gray-300 font-cinzel tracking-widest text-xs font-bold uppercase">Prix Réel ($) *</Label>
                         <Input
                             id="price"
                             type="number"
@@ -242,8 +253,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId, onSuccess, onCance
                             value={formData.price}
                             onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
                             placeholder="0.00"
-                            required
-                            className="bg-black/40 border-white/10 focus:border-luxury-gold/50 text-white"
+                            required={formData.is_money_enabled}
+                            className="bg-black/40 border-white/10 focus:border-luxury-gold/50 text-white font-bold text-lg"
                         />
                     </div>
 
@@ -385,6 +396,60 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId, onSuccess, onCance
                             <Label htmlFor="soldOut" className="text-red-400 cursor-pointer">Marquer comme Vendu (Rupture)</Label>
                         </div>
 
+                        <hr className="border-white/5 my-2" />
+                        <h4 className="text-xs font-bold text-luxury-gold uppercase tracking-widest">Options de Paiement</h4>
+
+                        <div className="flex items-center space-x-2">
+                            <input
+                                type="checkbox"
+                                id="is_money_enabled"
+                                checked={formData.is_money_enabled}
+                                onChange={(e) => setFormData(prev => ({ ...prev, is_money_enabled: e.target.checked }))}
+                                className="w-4 h-4 rounded border-luxury-gold/50 text-luxury-gold focus:ring-luxury-gold bg-black"
+                            />
+                            <Label htmlFor="is_money_enabled" className="text-gray-300 cursor-pointer">Activer Paiement Réel ($)</Label>
+                        </div>
+
+                        <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="is_points_enabled" className="text-blue-400 font-bold uppercase tracking-widest text-[10px] flex items-center gap-2">
+                                    <Star size={12} className="fill-blue-400" />
+                                    Statut Activation Points (Nombre &gt; 0)
+                                </Label>
+                                <Input
+                                    id="is_points_enabled"
+                                    type="number"
+                                    step="1"
+                                    value={formData.is_points_enabled}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, is_points_enabled: Number(e.target.value) }))}
+                                    placeholder="0 = Désactivé"
+                                    className="bg-black/40 border-blue-500/30 focus:border-blue-500 text-white w-full"
+                                />
+                                <p className="text-[9px] text-blue-400/60 font-medium italic">Entrez '1' (ou plus) pour activer le paiement par points.</p>
+                            </div>
+
+                            {formData.is_points_enabled > 0 && (
+                                <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    className="space-y-2 pt-3 border-t border-blue-500/10"
+                                >
+                                    <Label htmlFor="points_price" className="text-blue-400 font-bold uppercase tracking-widest text-[10px]">Prix de vente en Points</Label>
+                                    <Input
+                                        id="points_price"
+                                        type="number"
+                                        step="1"
+                                        min="0"
+                                        value={formData.points_price === 0 ? '' : formData.points_price}
+                                        onChange={(e) => setFormData({ ...formData, points_price: e.target.value === '' ? 0 : parseInt(e.target.value) })}
+                                        placeholder="Ex: 5000"
+                                        className="bg-black/40 border-blue-500/50 focus:border-blue-400 text-white font-black text-xl"
+                                    />
+                                    <p className="text-[9px] text-blue-400/80">C'est ce montant qui sera déduit du joueur.</p>
+                                </motion.div>
+                            )}
+                        </div>
+
                         <div className="flex items-center space-x-2">
                             <input
                                 type="checkbox"
@@ -422,7 +487,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId, onSuccess, onCance
                     </div>
                 </form>
             </CardContent>
-        </Card>
+        </Card >
     );
 };
 

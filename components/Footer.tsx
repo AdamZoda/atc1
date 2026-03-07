@@ -15,10 +15,14 @@ const Footer: React.FC = () => {
   React.useEffect(() => {
     const fetchServerData = async () => {
       try {
+        if (!siteConfig.server.cfxId) return;
         const timestamp = new Date().getTime();
-        const apiUri = `https://servers-frontend.fivem.net/api/servers/single/vzbjxk?t=${timestamp}`;
+        const apiUri = `https://servers-frontend.fivem.net/api/servers/single/${siteConfig.server.cfxId}?t=${timestamp}`;
         const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(apiUri)}`);
+
+        // Silently return if 404 or other error to avoid console spam
         if (!response.ok) return;
+
         const json = await response.json();
         const data = json.Data;
         if (data) {

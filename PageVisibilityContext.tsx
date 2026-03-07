@@ -46,6 +46,7 @@ export const PageVisibilityProvider: React.FC<{ children: ReactNode }> = ({ chil
           Gallery: true,
           About: true,
           Chat: true,
+          WheelGame: true,
         });
       } finally {
         setLoading(false);

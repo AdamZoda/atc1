@@ -24,6 +24,8 @@ import AuthCallback from './pages/AuthCallback';
 import ProfilePage from './pages/Profile';
 import Chat from './pages/Chat';
 import Blog from './pages/Blog';
+import WheelGame from './pages/WheelGame';
+import GameHub from './pages/GameHub';
 
 // Components
 import Navbar from './components/Navbar';
@@ -291,6 +293,8 @@ const AppContent = () => {
               <Route path="/shop" element={<Shop />} />
               <Route path="/blog" element={<Blog />} />
               <Route path="/blog/:slug" element={<Blog />} />
+              <Route path="/game" element={<GameHub />} />
+              <Route path="/game/wheel" element={<WheelGame />} />
 
               {/* Protected Routes */}
               <Route

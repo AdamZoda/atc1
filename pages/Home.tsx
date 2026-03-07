@@ -50,10 +50,13 @@ const Home: React.FC = () => {
   useEffect(() => {
     const fetchServerData = async () => {
       try {
+        if (!siteConfig.server.cfxId) return;
         // Ajout d'un timestamp pour forcer le rafraîchissement (anti-cache)
         const timestamp = new Date().getTime();
-        const apiUri = `https://servers-frontend.fivem.net/api/servers/single/vzbjxk?t=${timestamp}`;
+        const apiUri = `https://servers-frontend.fivem.net/api/servers/single/${siteConfig.server.cfxId}?t=${timestamp}`;
         const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(apiUri)}`);
+
+        // Silently return if 404/Not Found to avoid console clutter
         if (!response.ok) return;
 
         const json = await response.json();

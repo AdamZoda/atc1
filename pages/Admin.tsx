@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../supabaseClient';
 import { Profile, Post, RuleCategory, Rule } from '../types';
-import { Users, FilePlus, FileText, ShieldCheck, Trash2, Upload, Send, LayoutDashboard, Settings, Video, Image as ImageIcon, BookOpen, History, Activity, Ticket, Music, Play, Pause, Copy, Check, Clock, Calendar, X, RefreshCcw, MessageSquare, ShoppingBag, Package } from 'lucide-react';
+import { Users, FilePlus, FileText, ShieldCheck, Trash2, Upload, Send, LayoutDashboard, Settings, Video, Image as ImageIcon, BookOpen, History, Activity, Ticket, Music, Play, Pause, Copy, Check, Clock, Calendar, X, RefreshCcw, MessageSquare, ShoppingBag, Package, Dices, Star } from 'lucide-react';
 import ProductForm from '../components/ProductForm';
 import { useLanguage } from '../LanguageContext';
 import LocationDisplay from '../components/LocationDisplay';
 
+import { toast } from 'sonner';
 import Toast from '../components/Toast';
 
 // --- NOUVEAUX COMPOSANTS POUR L'INTERFACE TXADMIN ---
@@ -113,9 +114,54 @@ const PlayerDetailsModal: React.FC<{
   currentRole?: string;
 }> = ({ user, isOpen, onClose, onBan, onUnban, onWarn, onDelete, onPromote, onRemoveAdmin, onUpdateNotes, onSync, onMessage, currentRole }) => {
   const [localNotes, setLocalNotes] = React.useState('');
-  const [activeTab, setActiveTab] = React.useState<'actions' | 'info' | 'notes' | 'json'>('actions');
+  const [activeTab, setActiveTab] = React.useState<'actions' | 'info' | 'notes' | 'json' | 'inventory'>('actions');
+  const [userAssets, setUserAssets] = React.useState<any[]>([]);
+  const [loadingAssets, setLoadingAssets] = React.useState(false);
   const [rawAuthData, setRawAuthData] = React.useState<any>(null);
   const [loadingAuth, setLoadingAuth] = React.useState(false);
+
+  const fetchUserAssets = async (userId: string) => {
+    setLoadingAssets(true);
+    try {
+      const { data, error } = await supabase
+        .from('user_inventory')
+        .select(`
+          *,
+          product:products (*),
+          verifier:verified_by (display_name, username)
+        `)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      setUserAssets(data || []);
+    } catch (err) {
+      console.error('Erreur chargement inventaire:', err);
+    } finally {
+      setLoadingAssets(false);
+    }
+  };
+
+  const handleVerifyAsset = async (assetId: string) => {
+    try {
+      const { data: { user: adminUser } } = await supabase.auth.getUser();
+      if (!adminUser) throw new Error("Non authentifié");
+
+      const { error } = await supabase
+        .from('user_inventory')
+        .update({
+          verified_by: adminUser.id,
+          verified_at: new Date().toISOString()
+        })
+        .eq('id', assetId);
+
+      if (error) throw error;
+
+      toast.success("Remise vérifiée avec succès !");
+      if (user) fetchUserAssets(user.id);
+    } catch (err: any) {
+      toast.error(err.message || "Erreur lors de la vérification");
+    }
+  };
 
   const fetchRawAuth = async (userId: string) => {
     setLoadingAuth(true);
@@ -155,7 +201,9 @@ const PlayerDetailsModal: React.FC<{
       setLocalNotes(user.admin_notes || '');
       setActiveTab('actions');
       setRawAuthData(null);
+      setUserAssets([]);
       fetchRawAuth(user.id);
+      fetchUserAssets(user.id);
     }
   }, [user]);
 
@@ -167,6 +215,7 @@ const PlayerDetailsModal: React.FC<{
   const tabs = [
     { id: 'actions', label: 'Actions', icon: <Activity size={18} /> },
     { id: 'info', label: 'Info', icon: <Users size={18} /> },
+    { id: 'inventory', label: 'Inventaire', icon: <Package size={18} /> },
     { id: 'notes', label: 'Notes', icon: <FileText size={18} /> },
     { id: 'json', label: 'IDs / JSON', icon: <History size={18} /> },
   ] as const;
@@ -304,9 +353,22 @@ const PlayerDetailsModal: React.FC<{
                         alt={user.username}
                         className="w-24 h-24 rounded-3xl object-cover border-2 border-white/10"
                       />
-                      <div>
-                        <h4 className="text-xl font-black text-white">{user.display_name || user.username}</h4>
-                        <p className="text-xs text-luxury-gold font-bold uppercase tracking-widest mt-1">{user.role}</p>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="text-xl font-black text-white">{user.display_name || user.username}</h4>
+                            <p className="text-xs text-luxury-gold font-bold uppercase tracking-widest mt-1">{user.role}</p>
+                          </div>
+                          <div className="text-right">
+                            <div className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                              <Star size={16} className="fill-blue-400 text-blue-400" />
+                              <div>
+                                <p className="text-[10px] text-blue-400/60 font-black uppercase tracking-widest leading-none mb-1">Points Gaming</p>
+                                <p className="text-xl font-black text-blue-400 leading-none">{user.points || 0}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                         <div className="flex items-center gap-4 mt-4">
                           <span className={`px-3 py-1 rounded-full text-[10px] font-black ${isActuallyOnline ? 'bg-green-500/20 text-green-500' : 'bg-gray-500/20 text-gray-500'}`}>
                             {isActuallyOnline ? 'EN LIGNE' : 'HORS LIGNE'}
@@ -356,6 +418,77 @@ const PlayerDetailsModal: React.FC<{
                   </div>
                 )}
 
+                {activeTab === 'inventory' && (
+                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">Objets Possédés ({userAssets.length})</h4>
+                    </div>
+
+                    {loadingAssets ? (
+                      <div className="flex items-center justify-center h-48">
+                        <RefreshCcw className="animate-spin text-luxury-gold" size={32} />
+                      </div>
+                    ) : userAssets.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-64 bg-white/5 border border-dashed border-white/10 rounded-[2rem] gap-4">
+                        <Package size={48} className="text-gray-600" />
+                        <p className="text-gray-500 font-cinzel text-sm uppercase tracking-widest text-center px-8">Cet utilisateur ne possède aucun objet dans son inventaire.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-4">
+                        {userAssets.map((asset) => (
+                          <div key={asset.id} className="group relative bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-luxury-gold/50 transition-all">
+                            <div className="aspect-video w-full relative">
+                              {asset.product?.image_url || asset.product?.images?.[0] ? (
+                                <img
+                                  src={asset.product.image_url || asset.product.images[0]}
+                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                  alt={asset.product.name}
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-black/40 flex items-center justify-center">
+                                  <ShoppingBag size={24} className="text-luxury-gold/20" />
+                                </div>
+                              )}
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
+                              <div className="absolute bottom-3 left-3 right-3 text-white">
+                                <p className="text-[10px] text-luxury-gold font-black uppercase tracking-widest truncate">{asset.product?.name || 'Produit Inconnu'}</p>
+                                <div className="flex items-center justify-between mt-1">
+                                  <span className="text-[8px] text-gray-400 font-mono uppercase">Acheté le {new Date(asset.created_at).toLocaleDateString()}</span>
+                                  <span className="text-[8px] px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded-sm font-black uppercase border border-blue-500/30">
+                                    {asset.purchase_price} PTS
+                                  </span>
+                                </div>
+
+                                <div className="mt-2 pt-2 border-t border-white/5">
+                                  {asset.verified_at ? (
+                                    <div className="flex items-center gap-2 text-green-400">
+                                      <Check size={10} strokeWidth={3} />
+                                      <span className="text-[8px] font-black uppercase tracking-widest">
+                                        Vérifié par {asset.verifier?.display_name || asset.verifier?.username || 'Admin'} le {new Date(asset.verified_at).toLocaleDateString()}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleVerifyAsset(asset.id);
+                                      }}
+                                      className="w-full py-1.5 bg-luxury-gold/10 hover:bg-luxury-gold text-luxury-gold hover:text-black rounded-lg border border-luxury-gold/30 transition-all font-black text-[8px] uppercase tracking-widest flex items-center justify-center gap-1.5"
+                                    >
+                                      <ShieldCheck size={10} />
+                                      Vérifier la remise
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {activeTab === 'notes' && (
                   <div className="h-full flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <textarea
@@ -401,7 +534,7 @@ const PlayerDetailsModal: React.FC<{
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'users' | 'posts' | 'config' | 'rules' | 'logs' | 'tickets' | 'music' | 'chat' | 'shop'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'posts' | 'config' | 'rules' | 'logs' | 'tickets' | 'music' | 'chat' | 'shop' | 'game'>('users');
   const [users, setUsers] = useState<Profile[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [categories, setCategories] = useState<RuleCategory[]>([]);
@@ -527,6 +660,30 @@ const Admin: React.FC = () => {
   const [adScriptUrl, setAdScriptUrl] = useState('');
   const [adSubmitting, setAdSubmitting] = useState(false);
 
+  // Wheel Management States
+  const [wheelRewards, setWheelRewards] = useState<any[]>([]);
+  const [wheelRewardsLoading, setWheelRewardsLoading] = useState(false);
+  const [newRewardLabel, setNewRewardLabel] = useState('');
+  const [newRewardType, setNewRewardType] = useState<'points' | 'text'>('points');
+  const [newRewardValue, setNewRewardValue] = useState('');
+  const [newRewardPercentage, setNewRewardPercentage] = useState(0);
+  const [newRewardPoints, setNewRewardPoints] = useState(0);
+  const [newRewardWeight, setNewRewardWeight] = useState(1);
+  const [newRewardColor, setNewRewardColor] = useState('#D4AF37');
+  const [rewardSubmitting, setRewardSubmitting] = useState(false);
+  const [wheelSpinsPerDay, setWheelSpinsPerDay] = useState('1');
+  const [wheelSettingsSubmitting, setWheelSettingsSubmitting] = useState(false);
+  const [wheelEnabled, setWheelEnabled] = useState(false);
+  const [wheelLayout, setWheelLayout] = useState<string[]>(new Array(24).fill(''));
+  const [wheelLayoutSubmitting, setWheelLayoutSubmitting] = useState(false);
+
+  // Gift Spins state
+  const [giftSpinsUsername, setGiftSpinsUsername] = useState('');
+  const [giftSpinsCount, setGiftSpinsCount] = useState(1);
+  const [giftPointsCount, setGiftPointsCount] = useState(0);
+  const [giftToAll, setGiftToAll] = useState(false);
+  const [giftSpinsSubmitting, setGiftSpinsSubmitting] = useState(false);
+  const [spinStats, setSpinStats] = useState<{ total_spins: number; total_points_given: number; top_winner: string | null }>({ total_spins: 0, total_points_given: 0, top_winner: null });
   // Admin Toast state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -576,6 +733,9 @@ const Admin: React.FC = () => {
       fetchProducts();
       fetchProductCategories();
       fetchAdConfig();
+      fetchWheelRewards();
+      fetchWheelLayout();
+      fetchSpinStats();
 
       // Realtime subscription for users
       const channel = supabase
@@ -874,9 +1034,10 @@ const Admin: React.FC = () => {
         'Rules': 'Règles',
         'Community': 'Communauté',
         'Shop': 'Shop',
-        'Gallery': 'Galerie',
         'About': 'À propos',
-        'Chat': 'Chat'
+        'Chat': 'Chat',
+        'Blog': 'Blog',
+        'WheelGame': 'Jeux'
       };
       const pageName = pageNames[pageId] || pageId;
       const action = isVisible ? '👁️ a rendu visible' : '🚫 a caché';
@@ -1813,10 +1974,234 @@ const Admin: React.FC = () => {
         .eq('key', 'ad_script_url')
         .single();
       if (urlData) setAdScriptUrl(urlData.value);
+
+      // Wheel settings
+      const { data: wheelSpinsData } = await supabase.from('settings').select('value').eq('key', 'wheel_spins_per_day');
+      if (wheelSpinsData && wheelSpinsData.length > 0) setWheelSpinsPerDay(wheelSpinsData[0].value);
+
+      const { data: wheelEnabledData } = await supabase.from('settings').select('value').eq('key', 'wheel_enabled');
+      if (wheelEnabledData && wheelEnabledData.length > 0) {
+        setWheelEnabled(wheelEnabledData[0].value === 'true');
+      }
+
     } catch (error) {
-      console.error('Error fetching ad config:', error);
+      console.error('Error fetching config:', error);
     }
   };
+
+  const fetchWheelRewards = async () => {
+    try {
+      setWheelRewardsLoading(true);
+      const { data, error } = await supabase
+        .from('wheel_rewards')
+        .select('*')
+        .order('id', { ascending: true });
+      if (error) throw error;
+      setWheelRewards(data || []);
+    } catch (error) {
+      console.error('Error fetching wheel rewards:', error);
+    } finally {
+      setWheelRewardsLoading(false);
+    }
+  };
+
+  const fetchSpinStats = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('spin_history')
+        .select('points_won, profiles(username)');
+
+      if (error) throw error;
+
+      if (data) {
+        const total_spins = data.length;
+        const total_points_given = data.reduce((sum, s) => sum + (s.points_won || 0), 0);
+
+        // Find top winner
+        const winners: { [key: string]: number } = {};
+        data.forEach(s => {
+          const name = s.profiles?.username || 'Inconnu';
+          winners[name] = (winners[name] || 0) + (s.points_won || 0);
+        });
+
+        let top_winner = null;
+        let max_points = 0;
+        Object.entries(winners).forEach(([name, points]) => {
+          if (points > max_points) {
+            max_points = points;
+            top_winner = name;
+          }
+        });
+
+        setSpinStats({ total_spins, total_points_given, top_winner });
+      }
+    } catch (error) {
+      console.error('Error fetching spin stats:', error);
+    }
+  };
+
+  const fetchWheelLayout = async () => {
+    try {
+      const { data, error } = await supabase.from('settings').select('value').eq('key', 'wheel_layout');
+      if (error) throw error;
+      if (data && data.length > 0) {
+        setWheelLayout(JSON.parse(data[0].value));
+      }
+    } catch (error) {
+      console.error('Error fetching wheel layout:', error);
+    }
+  };
+
+  const handleUpdateWheelLayout = async (newLayout: string[]) => {
+    setWheelLayoutSubmitting(true);
+    try {
+      const { error } = await supabase.from('settings').upsert({
+        key: 'wheel_layout',
+        value: JSON.stringify(newLayout),
+        type: 'text'
+      }, { onConflict: 'key' });
+
+      if (error) throw error;
+      showToast('✅ Mappage de la roue enregistré !');
+      setWheelLayout(newLayout);
+      await logAdminAction('update_wheel_layout', '🎮 Mise à jour manuelle des 24 segments de la roue', 'game', 'wheel');
+    } catch (error: any) {
+      showToast('❌ Erreur: ' + error.message, 'error');
+    } finally {
+      setWheelLayoutSubmitting(false);
+    }
+  };
+
+  const addWheelReward = async () => {
+    if (!newRewardLabel.trim()) return;
+    setRewardSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('wheel_rewards')
+        .insert([{
+          label: newRewardLabel,
+          reward_type: newRewardType,
+          reward_value: newRewardType === 'points' ? newRewardPoints.toString() : newRewardValue,
+          points: newRewardType === 'points' ? newRewardPoints : 0,
+          probability_weight: newRewardWeight, // Deprecated but keeping for legacy compatibility if needed
+          percentage: newRewardPercentage,
+          color: newRewardColor
+        }]);
+
+      if (error) throw error;
+      showToast('✅ Récompense ajoutée');
+      await fetchWheelRewards();
+
+      setNewRewardLabel('');
+      setNewRewardPoints(0);
+      setNewRewardValue('');
+      setNewRewardPercentage(0);
+      setNewRewardWeight(1);
+      setNewRewardColor('#D4AF37');
+    } catch (error: any) {
+      showToast('❌ Erreur: ' + error.message, 'error');
+    } finally {
+      setRewardSubmitting(false);
+    }
+  };
+
+  const deleteWheelReward = async (id: string) => {
+    try {
+      const { error } = await supabase.from('wheel_rewards').delete().eq('id', id);
+      if (error) throw error;
+      showToast('✅ Récompense supprimée');
+      await fetchWheelRewards();
+    } catch (error: any) {
+      showToast('❌ Erreur: ' + error.message, 'error');
+    }
+  };
+
+  const toggleWheelReward = async (id: string, currentState: boolean) => {
+    try {
+      const { error } = await supabase.from('wheel_rewards').update({ is_active: !currentState }).eq('id', id);
+      if (error) throw error;
+      await fetchWheelRewards();
+    } catch (error: any) {
+      showToast('❌ Erreur: ' + error.message, 'error');
+    }
+  };
+
+  const handleUpdateWheelSettings = async () => {
+    setWheelSettingsSubmitting(true);
+    try {
+      await supabase.from('settings').upsert({ key: 'wheel_spins_per_day', value: wheelSpinsPerDay.toString(), type: 'image' }, { onConflict: 'key' });
+      await supabase.from('settings').upsert({ key: 'wheel_enabled', value: wheelEnabled ? 'true' : 'false', type: 'image' }, { onConflict: 'key' });
+      showToast('✅ Paramètres de la roue mis à jour');
+    } catch (error: any) {
+      showToast('❌ Erreur: ' + error.message, 'error');
+    } finally {
+      setWheelSettingsSubmitting(false);
+    }
+  };
+
+  const giftBonusSpins = async () => {
+    if (!giftToAll && !giftSpinsUsername.trim()) return;
+    setGiftSpinsSubmitting(true);
+    try {
+      if (giftToAll) {
+        // Bulk Gift Unified
+        const { error } = await supabase.rpc('gift_bulk_assets', {
+          p_spins: Number(giftSpinsCount),
+          p_points: Number(giftPointsCount)
+        });
+
+        if (error) {
+          console.error("Bulk Gift Error Details:", error);
+          throw error;
+        }
+        showToast(`✅ Cadeaux envoyés à TOUS les utilisateurs (${giftSpinsCount} tours, ${giftPointsCount} pts)`);
+      } else {
+        // Single user gift
+        // Find user by username
+        const { data: targetUser, error: findError } = await supabase
+          .from('profiles')
+          .select('id, username, points')
+          .ilike('username', giftSpinsUsername.trim())
+          .single();
+
+        if (findError || !targetUser) {
+          showToast('❌ Utilisateur introuvable: ' + giftSpinsUsername, 'error');
+          return;
+        }
+
+        // Gift Spins via RPC
+        if (giftSpinsCount > 0) {
+          const { error: spinError } = await supabase.rpc('gift_bonus_spins', {
+            target_user_id: targetUser.id,
+            spins_count: giftSpinsCount
+          });
+          if (spinError) throw spinError;
+        }
+
+        // Gift Points via direct update
+        if (giftPointsCount > 0) {
+          const { error: pointError } = await supabase
+            .from('profiles')
+            .update({ points: (targetUser.points || 0) + giftPointsCount })
+            .eq('id', targetUser.id);
+          if (pointError) throw pointError;
+        }
+
+        showToast(`✅ Cadeaux envoyés à ${targetUser.username} (${giftSpinsCount} tours, ${giftPointsCount} pts)`);
+      }
+
+      setGiftSpinsUsername('');
+      setGiftSpinsCount(1);
+      setGiftPointsCount(0);
+      setGiftToAll(false);
+      fetchUsers(); // Refresh global users list
+    } catch (error: any) {
+      showToast('❌ Erreur: ' + error.message, 'error');
+    } finally {
+      setGiftSpinsSubmitting(false);
+    }
+  };
+
 
   const handleUpdateAdConfig = async () => {
     setAdSubmitting(true);
@@ -2200,7 +2585,12 @@ const Admin: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setProducts(data || []);
+      const mappedProducts = (data || []).map(p => ({
+        ...p,
+        points_price: Number(p.points_price) || 0,
+        is_points_enabled: typeof p.is_points_enabled === 'number' ? p.is_points_enabled : (p.is_points_enabled ? 1 : 0)
+      }));
+      setProducts(mappedProducts);
     } catch (error: any) {
       console.error('Error fetching products:', error);
     }
@@ -2283,6 +2673,10 @@ const Admin: React.FC = () => {
                   setActiveTab('config');
                   fetchAdminTeam();
                   fetchGlobalNotifications();
+                  fetchAdConfig();
+                  fetchWheelRewards();
+                  fetchWheelLayout();
+                  fetchSpinStats();
                 }}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'config' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
               >
@@ -2339,6 +2733,18 @@ const Admin: React.FC = () => {
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'shop' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
               >
                 <ShoppingBag size={16} /> Shop
+              </button>
+            )}
+            {profile?.role === 'admin' && (
+              <button
+                onClick={() => {
+                  setActiveTab('game');
+                  fetchWheelRewards();
+                  fetchSpinStats();
+                }}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-bold uppercase transition-all ${activeTab === 'game' ? 'bg-luxury-gold text-black' : 'hover:bg-white/5'}`}
+              >
+                <Dices size={16} /> Jeux
               </button>
             )}
           </div>
@@ -2758,6 +3164,7 @@ const Admin: React.FC = () => {
                   'About': 'ℹ️ À propos',
                   'Chat': '💬 Chat',
                   'Blog': '📝 Blog',
+                  'WheelGame': '🎮 Jeux',
                 }).map(([pageId, label]) => (
                   <div
                     key={pageId}
@@ -3168,6 +3575,94 @@ const Admin: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {/* MANUAL WHEEL MAPPING SECTION */}
+              <div className="mt-12 glass p-8 rounded-2xl border border-luxury-gold/20 bg-luxury-gold/5">
+                <div className="flex items-center justify-between mb-8">
+                  <div>
+                    <h4 className="text-xl font-cinzel font-bold text-luxury-gold uppercase tracking-widest">🗺️ Mappage Manuel (24 Segments)</h4>
+                    <p className="text-gray-500 text-[10px] mt-1">Attribuez chaque segment de la roue à une récompense spécifique pour un contrôle total.</p>
+                  </div>
+                  <button
+                    onClick={() => handleUpdateWheelLayout(wheelLayout)}
+                    disabled={wheelLayoutSubmitting}
+                    className="px-6 py-2 bg-luxury-gold text-black font-black text-xs uppercase rounded-lg hover:bg-luxury-goldLight transition-all disabled:opacity-50"
+                  >
+                    {wheelLayoutSubmitting ? 'Enregistrement...' : 'Enregistrer le Mappage'}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {wheelLayout.map((rewardId, idx) => {
+                    const currentReward = wheelRewards.find(r => r.id === rewardId);
+                    return (
+                      <div key={idx} className="space-y-2">
+                        <label className="block text-[9px] font-black text-gray-500 uppercase">Segment {idx + 1}</label>
+                        <select
+                          value={rewardId}
+                          onChange={(e) => {
+                            const newLayout = [...wheelLayout];
+                            newLayout[idx] = e.target.value;
+                            setWheelLayout(newLayout);
+                          }}
+                          className="w-full bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-[10px] text-white focus:border-luxury-gold outline-none appearance-none cursor-pointer"
+                          style={{ borderLeft: currentReward ? `4px solid ${currentReward.color}` : 'none' }}
+                        >
+                          <option value="">-- Sélection --</option>
+                          {wheelRewards.filter(r => r.is_active).map(r => (
+                            <option key={r.id} value={r.id}>{r.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-8 p-4 bg-white/5 border border-white/5 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <span className="text-[10px] font-black text-gray-500 uppercase">Outils rapides:</span>
+                    <button
+                      onClick={() => {
+                        const activeRewards = wheelRewards.filter(r => r.is_active);
+                        if (activeRewards.length === 0) return;
+
+                        const totalPercent = activeRewards.reduce((sum, r) => sum + (r.percentage || 0), 0);
+                        if (totalPercent === 0) return;
+
+                        let virtual: string[] = [];
+                        activeRewards.forEach((reward) => {
+                          const count = Math.max(1, Math.round(((reward.percentage || 0) / totalPercent) * 24));
+                          for (let i = 0; i < count; i++) virtual.push(reward.id);
+                        });
+
+                        while (virtual.length < 24) virtual.push(activeRewards[0].id);
+                        if (virtual.length > 24) virtual = virtual.slice(0, 24);
+
+                        const interlaced = new Array(24);
+                        let currentPos = 0;
+                        virtual.forEach((val) => {
+                          while (interlaced[currentPos] !== undefined) {
+                            currentPos = (currentPos + 1) % 24;
+                          }
+                          interlaced[currentPos] = val;
+                          currentPos = (currentPos + 7) % 24;
+                        });
+                        setWheelLayout(interlaced);
+                      }}
+                      className="text-[10px] font-bold text-luxury-gold hover:underline"
+                    >
+                      Magie: Générer auto via %
+                    </button>
+                    <button
+                      onClick={() => setWheelLayout(new Array(24).fill(''))}
+                      className="text-[10px] font-bold text-red-500 hover:underline"
+                    >
+                      Vider tout
+                    </button>
+                  </div>
+                  <p className="text-[9px] text-gray-500 italic">* Le mappage manuel permet de placer précisément chaque gain sur la roue.</p>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -3492,6 +3987,261 @@ const Admin: React.FC = () => {
                 </p>
               </div>
             </div>
+
+
+          </div>
+        )}
+
+        {activeTab === 'game' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-3xl font-bold text-luxury-gold">🎮 Gestion des Jeux</h2>
+            </div>
+
+            {/* Wheel Configuration Section */}
+            <div className="glass p-8 rounded-2xl border border-white/5">
+              <div className="text-center mb-8">
+                <div className="w-12 h-12 bg-luxury-gold/10 rounded-xl flex items-center justify-center mx-auto mb-4 text-luxury-gold">
+                  🎰
+                </div>
+                <h3 className="text-xl font-cinzel font-bold uppercase tracking-widest">Roue de la Fortune</h3>
+                <p className="text-gray-500 text-xs mt-1">Gérer les récompenses et les limites de la roue</p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+
+                {/* Rewards Management */}
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold uppercase tracking-widest text-sm text-luxury-gold">🎁 Récompenses de la roue</h4>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold uppercase ${Math.abs(wheelRewards.filter(r => r.is_active).reduce((sum, r) => sum + (r.percentage || 0), 0) - 100) < 0.1 ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
+                      Total %: {wheelRewards.filter(r => r.is_active).reduce((sum, r) => sum + (r.percentage || 0), 0).toFixed(1)}%
+                    </span>
+                  </div>
+
+                  <div className="bg-black/40 border border-white/10 rounded-xl p-5 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="col-span-2">
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Label (Nom affiché)</label>
+                        <input type="text" value={newRewardLabel} onChange={e => setNewRewardLabel(e.target.value)} placeholder="Ex: Pass VIP ou 100 Points" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-luxury-gold outline-none" />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Type</label>
+                        <select
+                          value={newRewardType}
+                          onChange={e => setNewRewardType(e.target.value as 'points' | 'text')}
+                          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-luxury-gold outline-none"
+                        >
+                          <option value="points" className="bg-luxury-dark">Points</option>
+                          <option value="text" className="bg-luxury-dark">Texte / Cadeau</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">
+                          {newRewardType === 'points' ? 'Nombre de Points' : 'Nom du Cadeau'}
+                        </label>
+                        {newRewardType === 'points' ? (
+                          <input type="number" value={newRewardPoints} onChange={e => setNewRewardPoints(parseInt(e.target.value) || 0)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-luxury-gold outline-none" />
+                        ) : (
+                          <input type="text" value={newRewardValue} onChange={e => setNewRewardValue(e.target.value)} placeholder="Ex: Coffre Rare" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-luxury-gold outline-none" />
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Chance (%)</label>
+                        <input type="number" value={newRewardPercentage} onChange={e => setNewRewardPercentage(parseFloat(e.target.value) || 0)} step="0.1" min="0" max="100" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-luxury-gold outline-none" />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Couleur (Hex)</label>
+                        <div className="flex gap-2">
+                          <input type="color" value={newRewardColor} onChange={e => setNewRewardColor(e.target.value)} className="w-8 h-8 rounded shrink-0 cursor-pointer" />
+                          <input type="text" value={newRewardColor} onChange={e => setNewRewardColor(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-2 text-xs text-white focus:border-luxury-gold outline-none uppercase" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <button onClick={addWheelReward} disabled={rewardSubmitting} className="w-full py-2 bg-luxury-gold/20 text-luxury-gold hover:bg-luxury-gold/30 border border-luxury-gold/50 font-bold uppercase text-xs rounded-lg transition-all">
+                      {rewardSubmitting ? 'Ajout...' : '+ Ajouter Récompense'}
+                    </button>
+
+                    {Math.abs(wheelRewards.filter(r => r.is_active).reduce((sum, r) => sum + (r.percentage || 0), 0) - 100) > 0.1 && (
+                      <p className="text-[10px] text-red-500 font-bold text-center animate-pulse">
+                        ⚠️ Attention: Le total des chances doit être égal à 100% (Actuel: {wheelRewards.filter(r => r.is_active).reduce((sum, r) => sum + (r.percentage || 0), 0).toFixed(1)}%)
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+                    {wheelRewardsLoading ? (
+                      <p className="text-gray-500 text-center text-xs py-4">Chargement...</p>
+                    ) : wheelRewards.length === 0 ? (
+                      <p className="text-gray-500 text-center text-xs py-4">Aucune récompense configurée</p>
+                    ) : (
+                      wheelRewards.map(reward => (
+                        <div key={reward.id} className={`p-4 rounded-xl border flex items-center justify-between ${reward.is_active ? 'bg-black/30 border-white/10' : 'bg-red-900/10 border-red-500/20 opacity-50'}`}>
+                          <div className="flex items-center gap-3">
+                            <div className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: reward.color }}></div>
+                            <div>
+                              <p className="text-sm font-bold text-white">{reward.label}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-[10px] text-gray-400">
+                                  {reward.reward_type === 'text' ? '🎁 Cadeau: ' : '💰 Points: '}
+                                  <span className="text-gray-200 font-bold">{reward.reward_value || reward.points}</span>
+                                </p>
+                                {reward.is_active && (
+                                  <span className="text-[10px] font-black text-luxury-gold">({reward.percentage}% de chance)</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={() => toggleWheelReward(reward.id, reward.is_active)} className={`px-2 py-1 rounded text-xs font-bold ${reward.is_active ? 'bg-yellow-500/20 text-yellow-500' : 'bg-green-500/20 text-green-500'}`}>
+                              {reward.is_active ? 'Désactiver' : 'Activer'}
+                            </button>
+                            <button onClick={() => deleteWheelReward(reward.id)} className="px-2 py-1 rounded bg-red-500/20 text-red-500 text-xs font-bold hover:bg-red-500/40">
+                              Suppr
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* General Wheel Settings + Bonus Spins */}
+                <div className="space-y-6">
+                  <h4 className="font-bold uppercase tracking-widest text-sm text-luxury-gold">⚙️ Paramètres Généraux</h4>
+
+                  <div className="bg-black/40 border border-white/10 rounded-xl p-6 space-y-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-bold text-white mb-1">Activer le jeu de la roue</p>
+                        <p className="text-[10px] text-gray-400">Permet aux joueurs d'accéder et de jouer à la roue.</p>
+                      </div>
+                      <button
+                        onClick={() => setWheelEnabled(!wheelEnabled)}
+                        className={`w-14 h-7 rounded-full relative transition-all duration-300 ${wheelEnabled ? 'bg-luxury-gold' : 'bg-white/10'}`}
+                      >
+                        <div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all duration-300 ${wheelEnabled ? 'left-8' : 'left-1'}`} />
+                      </button>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Nombre de tours par jour par joueur</label>
+                      <input
+                        type="number"
+                        value={wheelSpinsPerDay}
+                        onChange={e => setWheelSpinsPerDay(e.target.value)}
+                        min="1"
+                        max="100"
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-luxury-gold outline-none"
+                      />
+                    </div>
+
+                    <button
+                      onClick={handleUpdateWheelSettings}
+                      disabled={wheelSettingsSubmitting}
+                      className="w-full py-3 bg-luxury-gold text-black font-black uppercase tracking-widest rounded-xl hover:bg-luxury-goldLight transition-all disabled:opacity-50"
+                    >
+                      {wheelSettingsSubmitting ? 'Enregistrement...' : 'Enregistrer'}
+                    </button>
+                  </div>
+
+                  {/* Gift Bonus Spins Section */}
+                  <div className="flex items-center justify-between mt-8">
+                    <h4 className="font-bold uppercase tracking-widest text-sm text-luxury-gold">🎁 Offrir des Cadeaux (Tours / Points)</h4>
+                    <label className="flex items-center gap-2 cursor-pointer group">
+                      <span className="text-[10px] font-black uppercase text-gray-500 group-hover:text-luxury-gold transition-colors">Tout le monde</span>
+                      <div
+                        onClick={() => setGiftToAll(!giftToAll)}
+                        className={`w-10 h-5 rounded-full relative transition-all duration-300 ${giftToAll ? 'bg-luxury-gold' : 'bg-white/10'}`}
+                      >
+                        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all duration-300 ${giftToAll ? 'left-5.5' : 'left-0.5'}`} />
+                      </div>
+                    </label>
+                  </div>
+
+                  <div className={`bg-black/40 border rounded-xl p-6 space-y-4 transition-all ${giftToAll ? 'border-luxury-gold shadow-[0_0_20px_rgba(212,175,55,0.1)]' : 'border-white/10'}`}>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="md:col-span-1">
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">
+                          {giftToAll ? 'Cible (Tous)' : 'Pseudo Utilisateur'}
+                          {!giftToAll && users.find(u => u.username.toLowerCase() === giftSpinsUsername.toLowerCase()) && (
+                            <span className="ml-2 text-luxury-gold">(Actuel: {users.find(u => u.username.toLowerCase() === giftSpinsUsername.toLowerCase())?.points || 0} pts)</span>
+                          )}
+                        </label>
+                        <input
+                          type="text"
+                          value={giftToAll ? 'TOUS LES UTILISATEURS' : giftSpinsUsername}
+                          onChange={e => !giftToAll && setGiftSpinsUsername(e.target.value)}
+                          disabled={giftToAll}
+                          placeholder="Ex: Admin"
+                          className={`w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-luxury-gold outline-none ${giftToAll ? 'opacity-50 font-black tracking-widest text-luxury-gold border-luxury-gold/30' : ''}`}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Tours Bonus</label>
+                        <input type="number" value={giftSpinsCount} onChange={e => setGiftSpinsCount(parseInt(e.target.value) || 0)} min="0" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-luxury-gold outline-none" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Points Boutique</label>
+                        <input type="number" value={giftPointsCount} onChange={e => setGiftPointsCount(parseInt(e.target.value) || 0)} min="0" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-luxury-gold outline-none" />
+                      </div>
+                    </div>
+                    <button
+                      onClick={giftBonusSpins}
+                      disabled={giftSpinsSubmitting}
+                      className={`w-full py-2 font-bold uppercase text-xs rounded-lg transition-all ${giftToAll ? 'bg-luxury-gold text-black hover:bg-luxury-goldLight' : 'bg-gradient-to-r from-luxury-gold/20 to-luxury-gold/10 text-luxury-gold hover:from-luxury-gold/30 hover:to-luxury-gold/20 border border-luxury-gold/50'}`}
+                    >
+                      {giftSpinsSubmitting ? 'Envoi...' : (giftToAll ? 'Générer Cadeau Global 🌎' : 'Envoyer les Cadeaux')}
+                    </button>
+
+                    {/* Quick Selection List (Hidden if GiftAll) */}
+                    {!giftToAll && (
+                      <div className="mt-4 animate-in fade-in slide-in-from-top-2">
+                        <p className="text-[10px] text-gray-500 uppercase font-black mb-2">Sélection Rapide (Joueurs Récents/Actifs)</p>
+                        <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-2 bg-black/20 rounded-lg border border-white/5">
+                          {users.slice(0, 10).map(u => (
+                            <button
+                              key={u.id}
+                              onClick={() => setGiftSpinsUsername(u.username)}
+                              className={`px-3 py-1.5 rounded-full border text-[10px] font-bold transition-all ${giftSpinsUsername === u.username ? 'bg-luxury-gold text-black border-luxury-gold' : 'bg-white/5 border-white/10 text-gray-400 hover:border-luxury-gold/50'}`}
+                            >
+                              {u.username} <span className="opacity-50 ml-1">({u.points || 0} pts)</span>
+                            </button>
+                          ))}
+                          {users.length === 0 && <p className="text-[10px] text-gray-600 italic">Aucun utilisateur trouvé</p>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Global Stats Section */}
+                  <h4 className="font-bold uppercase tracking-widest text-sm text-luxury-gold mt-8">📊 Statistiques Globales</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-white/5 border border-white/10 p-4 rounded-xl text-center">
+                      <p className="text-[10px] text-gray-500 uppercase font-black mb-1">Total lancers</p>
+                      <p className="text-xl font-black text-white">{spinStats.total_spins}</p>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 p-4 rounded-xl text-center">
+                      <p className="text-[10px] text-gray-500 uppercase font-black mb-1">Points distribués</p>
+                      <p className="text-xl font-black text-luxury-gold">{spinStats.total_points_given.toLocaleString()} PTS</p>
+                    </div>
+                    {spinStats.top_winner && (
+                      <div className="col-span-2 bg-luxury-gold/5 border border-luxury-gold/20 p-4 rounded-xl text-center">
+                        <p className="text-[10px] text-gray-500 uppercase font-black mb-1">👑 Plus gros gagnant</p>
+                        <p className="text-sm font-bold text-white">{spinStats.top_winner}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
           </div>
         )}
 
@@ -3578,692 +4328,713 @@ const Admin: React.FC = () => {
               )}
             </div>
           </div>
-        )}
+        )
+        }
 
-        {activeTab === 'tickets' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Liste des tickets */}
-            <div className="lg:col-span-1">
-              <div className="glass p-8 rounded-[3rem] border border-white/5">
-                <div className="text-center mb-8">
-                  <div className="w-16 h-16 bg-luxury-gold/10 rounded-2xl flex items-center justify-center mx-auto mb-4 text-luxury-gold">
-                    <Ticket size={32} />
-                  </div>
-                  <h3 className="text-xl font-cinzel font-bold uppercase tracking-widest">🎫 Tickets</h3>
-                </div>
-
-                {/* Filtre par status */}
-                <div className="mb-6 flex gap-2 flex-wrap items-center">
-                  {['OUVERT', 'EN_COURS', 'RÉSOLU', 'FERMÉ'].map((status) => (
-                    <button
-                      key={status}
-                      onClick={() => setTicketStatusFilter(status)}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold uppercase transition-all ${ticketStatusFilter === status
-                        ? 'bg-luxury-gold text-black'
-                        : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                        }`}
-                    >
-                      {status}
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => {
-                      if (window.true || confirm('Êtes-vous sûr de vouloir SUPPRIMER TOUS les tickets ?')) {
-                        tickets.forEach(ticket => deleteTicket(ticket.id));
-                      }
-                    }}
-                    className="ml-auto px-3 py-1 rounded-lg text-xs font-bold uppercase bg-red-700/30 text-red-600 hover:bg-red-700/50 transition-all"
-                    title="Supprimer tous les tickets"
-                  >
-                    🗑️ Tous
-                  </button>
-                </div>
-
-                {/* Liste des tickets */}
-                {ticketsLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="w-8 h-8 border-3 border-luxury-gold border-t-transparent rounded-full animate-spin"></div>
-                  </div>
-                ) : tickets.filter(t => t.status === ticketStatusFilter).length === 0 ? (
-                  <p className="text-gray-500 text-center py-8 text-sm">
-                    Aucun ticket {ticketStatusFilter.toLowerCase()}
-                  </p>
-                ) : (
-                  <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                    {tickets
-                      .filter(t => t.status === ticketStatusFilter)
-                      .map((ticket) => (
-                        <button
-                          key={ticket.id}
-                          onClick={() => {
-                            setSelectedTicket(ticket);
-                            fetchTicketMessages(ticket.id);
-                          }}
-                          className={`w-full text-left p-4 rounded-lg transition-all border ${selectedTicket?.id === ticket.id
-                            ? 'bg-luxury-gold/20 border-luxury-gold'
-                            : 'bg-white/5 border-white/10 hover:bg-white/10'
-                            }`}
-                        >
-                          <p className="text-sm font-bold text-white truncate">
-                            {ticket.display_name || ticket.username || 'Anonyme'}
-                          </p>
-                          <p className="text-xs text-gray-400 truncate mt-1">
-                            {ticket.description?.substring(0, 50)}...
-                          </p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <span className={`px-2 py-1 rounded text-xs font-bold ${ticket.status === 'OUVERT' ? 'bg-yellow-500/20 text-yellow-400' :
-                              ticket.status === 'EN_COURS' ? 'bg-blue-500/20 text-blue-400' :
-                                ticket.status === 'RÉSOLU' ? 'bg-green-500/20 text-green-400' :
-                                  'bg-red-500/20 text-red-400'
-                              }`}>
-                              {ticket.status}
-                            </span>
-                          </div>
-                        </button>
-                      ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Détail du ticket */}
-            <div className="lg:col-span-2">
-              {selectedTicket ? (
-                <div className="glass p-10 rounded-[3rem] border border-white/5 flex flex-col h-full">
-                  <div className="mb-8">
-                    <div className="flex items-start justify-between mb-6">
-                      <div>
-                        <h4 className="text-2xl font-bold text-white mb-2">
-                          {selectedTicket.display_name || selectedTicket.username || 'Anonyme'}
-                        </h4>
-                        <p className="text-gray-400 text-sm">
-                          ID: {selectedTicket.id.substring(0, 8)}...
-                        </p>
-                      </div>
-                      <span className={`px-4 py-2 rounded-lg text-sm font-bold ${selectedTicket.status === 'OUVERT' ? 'bg-yellow-500/20 text-yellow-400' :
-                        selectedTicket.status === 'EN_COURS' ? 'bg-blue-500/20 text-blue-400' :
-                          selectedTicket.status === 'RÉSOLU' ? 'bg-green-500/20 text-green-400' :
-                            'bg-red-500/20 text-red-400'
-                        }`}>
-                        {selectedTicket.status}
-                      </span>
+        {
+          activeTab === 'tickets' && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Liste des tickets */}
+              <div className="lg:col-span-1">
+                <div className="glass p-8 rounded-[3rem] border border-white/5">
+                  <div className="text-center mb-8">
+                    <div className="w-16 h-16 bg-luxury-gold/10 rounded-2xl flex items-center justify-center mx-auto mb-4 text-luxury-gold">
+                      <Ticket size={32} />
                     </div>
-
-                    {/* Timeline */}
-                    <div className="space-y-3 text-sm text-gray-400">
-                      <p>
-                        📅 <strong className="text-gray-300">Créé:</strong> {new Date(selectedTicket.created_at).toLocaleString('fr-FR')}
-                      </p>
-                      {selectedTicket.resolved_at && (
-                        <p>
-                          ✅ <strong className="text-gray-300">Résolu:</strong> {new Date(selectedTicket.resolved_at).toLocaleString('fr-FR')}
-                        </p>
-                      )}
-                    </div>
+                    <h3 className="text-xl font-cinzel font-bold uppercase tracking-widest">🎫 Tickets</h3>
                   </div>
 
-                  {/* Message */}
-                  <div className="mb-8">
-                    <h5 className="text-luxury-gold font-bold mb-4 uppercase text-sm">Message Initiel</h5>
-                    <div className="bg-white/5 border border-white/10 rounded-xl p-6 min-h-[100px]">
-                      <p className="text-white whitespace-pre-wrap">
-                        {selectedTicket.description}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Historique des messages */}
-                  <div className="mb-8 flex-1 flex flex-col">
-                    <div className="flex items-center justify-between mb-4">
-                      <h5 className="text-luxury-gold font-bold uppercase text-sm">💬 Conversation</h5>
+                  {/* Filtre par status */}
+                  <div className="mb-6 flex gap-2 flex-wrap items-center">
+                    {['OUVERT', 'EN_COURS', 'RÉSOLU', 'FERMÉ'].map((status) => (
                       <button
-                        onClick={() => fetchTicketMessages(selectedTicket.id)}
-                        className="text-xs text-gray-400 hover:text-gray-300 transition-all"
+                        key={status}
+                        onClick={() => setTicketStatusFilter(status)}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold uppercase transition-all ${ticketStatusFilter === status
+                          ? 'bg-luxury-gold text-black'
+                          : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                          }`}
                       >
-                        🔄 Actualiser
+                        {status}
                       </button>
-                    </div>
+                    ))}
+                    <button
+                      onClick={() => {
+                        if (window.true || confirm('Êtes-vous sûr de vouloir SUPPRIMER TOUS les tickets ?')) {
+                          tickets.forEach(ticket => deleteTicket(ticket.id));
+                        }
+                      }}
+                      className="ml-auto px-3 py-1 rounded-lg text-xs font-bold uppercase bg-red-700/30 text-red-600 hover:bg-red-700/50 transition-all"
+                      title="Supprimer tous les tickets"
+                    >
+                      🗑️ Tous
+                    </button>
+                  </div>
 
-                    {ticketMessagesLoading ? (
-                      <div className="flex items-center justify-center py-8">
-                        <div className="w-6 h-6 border-2 border-luxury-gold border-t-transparent rounded-full animate-spin"></div>
-                      </div>
-                    ) : ticketMessages.length === 0 ? (
-                      <p className="text-gray-500 text-sm py-8 text-center">
-                        Aucun message dans cette conversation
-                      </p>
-                    ) : (
-                      <div className="bg-white/5 border border-white/10 rounded-xl p-4 overflow-y-auto flex-1 space-y-3 mb-4">
-                        {ticketMessages.map((msg) => (
-                          <div key={msg.id} className={`p-4 rounded-lg ${msg.is_admin ? 'bg-luxury-gold/10 border border-luxury-gold/30' : 'bg-white/5 border border-white/10'}`}>
-                            <div className="flex items-center justify-between mb-2">
-                              <span className={`font-bold text-sm ${msg.is_admin ? 'text-luxury-gold' : 'text-white'}`}>
-                                {msg.is_admin ? '👨‍💼 ' : '👤 '}{msg.username}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                {new Date(msg.created_at).toLocaleString('fr-FR')}
+                  {/* Liste des tickets */}
+                  {ticketsLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="w-8 h-8 border-3 border-luxury-gold border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                  ) : tickets.filter(t => t.status === ticketStatusFilter).length === 0 ? (
+                    <p className="text-gray-500 text-center py-8 text-sm">
+                      Aucun ticket {ticketStatusFilter.toLowerCase()}
+                    </p>
+                  ) : (
+                    <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                      {tickets
+                        .filter(t => t.status === ticketStatusFilter)
+                        .map((ticket) => (
+                          <button
+                            key={ticket.id}
+                            onClick={() => {
+                              setSelectedTicket(ticket);
+                              fetchTicketMessages(ticket.id);
+                            }}
+                            className={`w-full text-left p-4 rounded-lg transition-all border ${selectedTicket?.id === ticket.id
+                              ? 'bg-luxury-gold/20 border-luxury-gold'
+                              : 'bg-white/5 border-white/10 hover:bg-white/10'
+                              }`}
+                          >
+                            <p className="text-sm font-bold text-white truncate">
+                              {ticket.display_name || ticket.username || 'Anonyme'}
+                            </p>
+                            <p className="text-xs text-gray-400 truncate mt-1">
+                              {ticket.description?.substring(0, 50)}...
+                            </p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className={`px-2 py-1 rounded text-xs font-bold ${ticket.status === 'OUVERT' ? 'bg-yellow-500/20 text-yellow-400' :
+                                ticket.status === 'EN_COURS' ? 'bg-blue-500/20 text-blue-400' :
+                                  ticket.status === 'RÉSOLU' ? 'bg-green-500/20 text-green-400' :
+                                    'bg-red-500/20 text-red-400'
+                                }`}>
+                                {ticket.status}
                               </span>
                             </div>
-                            <p className="text-sm text-gray-300 whitespace-pre-wrap">
-                              {msg.message}
-                            </p>
-                          </div>
+                          </button>
                         ))}
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
+                </div>
+              </div>
 
-                  {/* Section Admin Reply */}
-                  <div className="mb-8 border-t border-white/10 pt-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h5 className="text-luxury-gold font-bold uppercase text-sm">📝 Répondre</h5>
-                      <label className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={selectedTicket.allow_user_replies !== false}
-                          onChange={() => toggleUserReplies(selectedTicket.id, selectedTicket.allow_user_replies !== false)}
-                          className="w-4 h-4 cursor-pointer"
+              {/* Détail du ticket */}
+              <div className="lg:col-span-2">
+                {selectedTicket ? (
+                  <div className="glass p-10 rounded-[3rem] border border-white/5 flex flex-col h-full">
+                    <div className="mb-8">
+                      <div className="flex items-start justify-between mb-6">
+                        <div>
+                          <h4 className="text-2xl font-bold text-white mb-2">
+                            {selectedTicket.display_name || selectedTicket.username || 'Anonyme'}
+                          </h4>
+                          <p className="text-gray-400 text-sm">
+                            ID: {selectedTicket.id.substring(0, 8)}...
+                          </p>
+                        </div>
+                        <span className={`px-4 py-2 rounded-lg text-sm font-bold ${selectedTicket.status === 'OUVERT' ? 'bg-yellow-500/20 text-yellow-400' :
+                          selectedTicket.status === 'EN_COURS' ? 'bg-blue-500/20 text-blue-400' :
+                            selectedTicket.status === 'RÉSOLU' ? 'bg-green-500/20 text-green-400' :
+                              'bg-red-500/20 text-red-400'
+                          }`}>
+                          {selectedTicket.status}
+                        </span>
+                      </div>
+
+                      {/* Timeline */}
+                      <div className="space-y-3 text-sm text-gray-400">
+                        <p>
+                          📅 <strong className="text-gray-300">Créé:</strong> {new Date(selectedTicket.created_at).toLocaleString('fr-FR')}
+                        </p>
+                        {selectedTicket.resolved_at && (
+                          <p>
+                            ✅ <strong className="text-gray-300">Résolu:</strong> {new Date(selectedTicket.resolved_at).toLocaleString('fr-FR')}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Message */}
+                    <div className="mb-8">
+                      <h5 className="text-luxury-gold font-bold mb-4 uppercase text-sm">Message Initiel</h5>
+                      <div className="bg-white/5 border border-white/10 rounded-xl p-6 min-h-[100px]">
+                        <p className="text-white whitespace-pre-wrap">
+                          {selectedTicket.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Historique des messages */}
+                    <div className="mb-8 flex-1 flex flex-col">
+                      <div className="flex items-center justify-between mb-4">
+                        <h5 className="text-luxury-gold font-bold uppercase text-sm">💬 Conversation</h5>
+                        <button
+                          onClick={() => fetchTicketMessages(selectedTicket.id)}
+                          className="text-xs text-gray-400 hover:text-gray-300 transition-all"
+                        >
+                          🔄 Actualiser
+                        </button>
+                      </div>
+
+                      {ticketMessagesLoading ? (
+                        <div className="flex items-center justify-center py-8">
+                          <div className="w-6 h-6 border-2 border-luxury-gold border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      ) : ticketMessages.length === 0 ? (
+                        <p className="text-gray-500 text-sm py-8 text-center">
+                          Aucun message dans cette conversation
+                        </p>
+                      ) : (
+                        <div className="bg-white/5 border border-white/10 rounded-xl p-4 overflow-y-auto flex-1 space-y-3 mb-4">
+                          {ticketMessages.map((msg) => (
+                            <div key={msg.id} className={`p-4 rounded-lg ${msg.is_admin ? 'bg-luxury-gold/10 border border-luxury-gold/30' : 'bg-white/5 border border-white/10'}`}>
+                              <div className="flex items-center justify-between mb-2">
+                                <span className={`font-bold text-sm ${msg.is_admin ? 'text-luxury-gold' : 'text-white'}`}>
+                                  {msg.is_admin ? '👨‍💼 ' : '👤 '}{msg.username}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                  {new Date(msg.created_at).toLocaleString('fr-FR')}
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-300 whitespace-pre-wrap">
+                                {msg.message}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Section Admin Reply */}
+                    <div className="mb-8 border-t border-white/10 pt-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h5 className="text-luxury-gold font-bold uppercase text-sm">📝 Répondre</h5>
+                        <label className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={selectedTicket.allow_user_replies !== false}
+                            onChange={() => toggleUserReplies(selectedTicket.id, selectedTicket.allow_user_replies !== false)}
+                            className="w-4 h-4 cursor-pointer"
+                          />
+                          <span className="text-gray-400">Permettre les réponses utilisateur</span>
+                        </label>
+                      </div>
+
+                      <div className="space-y-3">
+                        <textarea
+                          value={adminReply}
+                          onChange={(e) => setAdminReply(e.target.value)}
+                          placeholder="Écrivez votre réponse..."
+                          className="w-full h-24 p-4 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-luxury-gold/50 focus:bg-white/10 transition-all resize-none"
                         />
-                        <span className="text-gray-400">Permettre les réponses utilisateur</span>
-                      </label>
-                    </div>
-
-                    <div className="space-y-3">
-                      <textarea
-                        value={adminReply}
-                        onChange={(e) => setAdminReply(e.target.value)}
-                        placeholder="Écrivez votre réponse..."
-                        className="w-full h-24 p-4 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-luxury-gold/50 focus:bg-white/10 transition-all resize-none"
-                      />
-                      <div className="grid grid-cols-3 gap-3">
-                        <button
-                          onClick={() => sendAdminReply(selectedTicket.id)}
-                          disabled={adminReplying || !adminReply.trim()}
-                          className="py-3 px-4 bg-luxury-gold/20 hover:bg-luxury-gold/30 disabled:opacity-50 border border-luxury-gold/50 rounded-lg text-luxury-gold font-bold uppercase transition-all"
-                        >
-                          {adminReplying ? '⏳' : '✉️'}
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (window.true || confirm('Êtes-vous sûr de vouloir supprimer ce ticket ?')) {
-                              deleteTicket(selectedTicket.id);
-                            }
-                          }}
-                          className="py-3 px-4 bg-red-700/20 hover:bg-red-700/30 text-red-700 font-bold rounded-lg transition-all"
-                        >
-                          🗑️
-                        </button>
-                        <button
-                          onClick={() => setSelectedTicket(null)}
-                          className="py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white font-bold transition-all"
-                        >
-                          ✕
-                        </button>
+                        <div className="grid grid-cols-3 gap-3">
+                          <button
+                            onClick={() => sendAdminReply(selectedTicket.id)}
+                            disabled={adminReplying || !adminReply.trim()}
+                            className="py-3 px-4 bg-luxury-gold/20 hover:bg-luxury-gold/30 disabled:opacity-50 border border-luxury-gold/50 rounded-lg text-luxury-gold font-bold uppercase transition-all"
+                          >
+                            {adminReplying ? '⏳' : '✉️'}
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (window.true || confirm('Êtes-vous sûr de vouloir supprimer ce ticket ?')) {
+                                deleteTicket(selectedTicket.id);
+                              }
+                            }}
+                            className="py-3 px-4 bg-red-700/20 hover:bg-red-700/30 text-red-700 font-bold rounded-lg transition-all"
+                          >
+                            🗑️
+                          </button>
+                          <button
+                            onClick={() => setSelectedTicket(null)}
+                            className="py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-white font-bold transition-all"
+                          >
+                            ✕
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="glass p-10 rounded-[3rem] border border-white/5 flex items-center justify-center min-h-[500px]">
-                  <p className="text-gray-500 text-center">
-                    👈 Sélectionne un ticket pour voir les détails
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'music' && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="space-y-6"
-          >
-            <h2 className="text-3xl font-bold text-luxury-gold">🎵 Gestion de la Musique</h2>
-
-            {/* Music Settings Form */}
-            <div className="glass p-8 rounded-3xl border border-white/10 space-y-6">
-              <h3 className="text-xl font-semibold text-luxury-gold uppercase tracking-widest">📤 Upload de Musique</h3>
-
-              {/* Music File Upload */}
-              <div>
-                <label className="block text-sm text-gray-300 mb-4 font-bold">Sélectionner un fichier audio</label>
-                <div className="relative">
-                  <input
-                    type="file"
-                    accept="audio/mp3,audio/wav,audio/ogg,audio/flac,.mp3,.wav,.ogg,.flac"
-                    onChange={(e) => setMusicFile(e.target.files?.[0] || null)}
-                    className="hidden"
-                    id="music-file-input"
-                  />
-                  <label
-                    htmlFor="music-file-input"
-                    className="block w-full bg-gradient-to-br from-purple-600/40 to-indigo-600/40 hover:from-purple-600/60 hover:to-indigo-600/60 border-2 border-dashed border-purple-400/50 hover:border-purple-400 rounded-2xl px-6 py-8 text-center cursor-pointer transition-all duration-300 group"
-                  >
-                    <div className="flex flex-col items-center justify-center gap-3">
-                      <div className="text-4xl group-hover:scale-110 transition-transform duration-300">🎵</div>
-                      <div>
-                        <p className="text-white font-bold text-lg">Choisir un fichier</p>
-                        <p className="text-purple-300 text-sm mt-1">ou glisser-déposer</p>
-                      </div>
-                      <p className="text-xs text-gray-400 mt-2">MP3 • WAV • OGG • FLAC</p>
-                    </div>
-                  </label>
-                </div>
-                {musicFile && (
-                  <div className="mt-4 p-3 bg-purple-500/20 border border-purple-400/50 rounded-lg">
-                    <p className="text-sm text-purple-300">✅ <span className="font-bold">{musicFile.name}</span></p>
-                    <p className="text-xs text-gray-400 mt-1">📊 {(musicFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Music Name Input */}
-              <div>
-                <label className="block text-sm text-gray-300 mb-3 font-bold">Nom de la Musique</label>
-                <input
-                  type="text"
-                  value={musicName}
-                  onChange={(e) => setMusicName(e.target.value)}
-                  placeholder="Ex: Atlantic RP - Ambiance"
-                  className="w-full bg-gradient-to-r from-white/5 to-white/10 border border-purple-400/30 hover:border-purple-400/50 focus:border-purple-400 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:bg-white/15 focus:ring-2 focus:ring-purple-500/30 transition-all"
-                />
-              </div>
-
-              {/* Upload Button */}
-              <motion.button
-                onClick={uploadMusicFile}
-                disabled={musicUploading || !musicFile || !musicName.trim()}
-                className="w-full bg-gradient-to-r from-emerald-600 via-emerald-500 to-green-500 hover:from-emerald-500 hover:via-emerald-400 hover:to-green-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition-all uppercase tracking-widest shadow-lg hover:shadow-emerald-500/50 border border-emerald-400/30 text-lg"
-              >
-                {musicUploading ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="animate-spin">⏳</div>
-                    <span>{uploadProgress}% - {uploadTimeRemaining}</span>
                   </div>
                 ) : (
-                  '📤 Uploader la Musique'
+                  <div className="glass p-10 rounded-[3rem] border border-white/5 flex items-center justify-center min-h-[500px]">
+                    <p className="text-gray-500 text-center">
+                      👈 Sélectionne un ticket pour voir les détails
+                    </p>
+                  </div>
                 )}
-              </motion.button>
-
-              {/* Upload Progress Bar */}
-              {musicUploading && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-300 font-semibold">Progression</span>
-                      <span className="text-sm font-bold text-emerald-400">{uploadProgress}%</span>
-                    </div>
-                    <div className="w-full h-4 bg-white/10 rounded-full overflow-hidden border border-emerald-400/30">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${uploadProgress}%` }}
-                        transition={{ duration: 0.3 }}
-                        className="h-full bg-gradient-to-r from-emerald-500 via-green-400 to-emerald-400 rounded-full shadow-lg shadow-emerald-500/50"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex justify-between items-center text-xs bg-black/20 rounded-lg p-3">
-                    <span className="text-gray-300">
-                      ⏱️ Temps restant: <span className="text-emerald-400 font-bold">{uploadTimeRemaining || 'Calcul...'}</span>
-                    </span>
-                    {musicFile && (
-                      <span className="text-gray-300">
-                        📊 <span className="text-emerald-400 font-bold">{(musicFile.size / (1024 * 1024)).toFixed(2)} MB</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="p-4 bg-emerald-500/15 border border-emerald-500/40 rounded-lg">
-                <p className="text-sm text-emerald-300">
-                  ✅ <span className="font-bold">Recommandé:</span> Uploadez votre musique directement pour éviter les problèmes CORS!
-                </p>
               </div>
             </div>
+          )
+        }
 
-            {/* Music Controls */}
-            <div className="glass p-8 rounded-3xl border border-white/10">
-              <h3 className="text-xl font-semibold text-luxury-gold uppercase tracking-widest mb-6">🎛️ Contrôles</h3>
+        {
+          activeTab === 'music' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-6"
+            >
+              <h2 className="text-3xl font-bold text-luxury-gold">🎵 Gestion de la Musique</h2>
 
-              <div className="space-y-6">
-                {/* Play/Pause Button */}
+              {/* Music Settings Form */}
+              <div className="glass p-8 rounded-3xl border border-white/10 space-y-6">
+                <h3 className="text-xl font-semibold text-luxury-gold uppercase tracking-widest">📤 Upload de Musique</h3>
+
+                {/* Music File Upload */}
+                <div>
+                  <label className="block text-sm text-gray-300 mb-4 font-bold">Sélectionner un fichier audio</label>
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept="audio/mp3,audio/wav,audio/ogg,audio/flac,.mp3,.wav,.ogg,.flac"
+                      onChange={(e) => setMusicFile(e.target.files?.[0] || null)}
+                      className="hidden"
+                      id="music-file-input"
+                    />
+                    <label
+                      htmlFor="music-file-input"
+                      className="block w-full bg-gradient-to-br from-purple-600/40 to-indigo-600/40 hover:from-purple-600/60 hover:to-indigo-600/60 border-2 border-dashed border-purple-400/50 hover:border-purple-400 rounded-2xl px-6 py-8 text-center cursor-pointer transition-all duration-300 group"
+                    >
+                      <div className="flex flex-col items-center justify-center gap-3">
+                        <div className="text-4xl group-hover:scale-110 transition-transform duration-300">🎵</div>
+                        <div>
+                          <p className="text-white font-bold text-lg">Choisir un fichier</p>
+                          <p className="text-purple-300 text-sm mt-1">ou glisser-déposer</p>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-2">MP3 • WAV • OGG • FLAC</p>
+                      </div>
+                    </label>
+                  </div>
+                  {musicFile && (
+                    <div className="mt-4 p-3 bg-purple-500/20 border border-purple-400/50 rounded-lg">
+                      <p className="text-sm text-purple-300">✅ <span className="font-bold">{musicFile.name}</span></p>
+                      <p className="text-xs text-gray-400 mt-1">📊 {(musicFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Music Name Input */}
+                <div>
+                  <label className="block text-sm text-gray-300 mb-3 font-bold">Nom de la Musique</label>
+                  <input
+                    type="text"
+                    value={musicName}
+                    onChange={(e) => setMusicName(e.target.value)}
+                    placeholder="Ex: Atlantic RP - Ambiance"
+                    className="w-full bg-gradient-to-r from-white/5 to-white/10 border border-purple-400/30 hover:border-purple-400/50 focus:border-purple-400 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:bg-white/15 focus:ring-2 focus:ring-purple-500/30 transition-all"
+                  />
+                </div>
+
+                {/* Upload Button */}
                 <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => toggleMusicPlayback()}
-                  disabled={musicSubmitting}
-                  className="w-full bg-gradient-to-r from-blue-600/80 to-blue-500/60 hover:from-blue-600 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-lg"
+                  onClick={uploadMusicFile}
+                  disabled={musicUploading || !musicFile || !musicName.trim()}
+                  className="w-full bg-gradient-to-r from-emerald-600 via-emerald-500 to-green-500 hover:from-emerald-500 hover:via-emerald-400 hover:to-green-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition-all uppercase tracking-widest shadow-lg hover:shadow-emerald-500/50 border border-emerald-400/30 text-lg"
                 >
-                  {isPlayingMusic ? (
-                    <>
-                      <Pause size={24} />
-                      Mettre en Pause
-                    </>
+                  {musicUploading ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="animate-spin">⏳</div>
+                      <span>{uploadProgress}% - {uploadTimeRemaining}</span>
+                    </div>
                   ) : (
-                    <>
-                      <Play size={24} />
-                      Lancer la Musique
-                    </>
+                    '📤 Uploader la Musique'
                   )}
                 </motion.button>
 
-                {/* Volume Control */}
-                <div className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">
-                  <label className="block text-sm text-gray-300 font-bold">Contrôle du Volume</label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={musicVolume}
-                    onChange={(e) => updateMusicVolume(parseInt(e.target.value))}
-                    className="w-full h-3 bg-white/10 rounded-lg appearance-none cursor-pointer accent-luxury-gold"
-                  />
-                  <div className="flex justify-between text-xs text-gray-400 font-bold">
-                    <span>🔇 Muet</span>
-                    <span className="text-luxury-gold">{musicVolume}%</span>
-                    <span>🔊 Max</span>
+                {/* Upload Progress Bar */}
+                {musicUploading && (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-300 font-semibold">Progression</span>
+                        <span className="text-sm font-bold text-emerald-400">{uploadProgress}%</span>
+                      </div>
+                      <div className="w-full h-4 bg-white/10 rounded-full overflow-hidden border border-emerald-400/30">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${uploadProgress}%` }}
+                          transition={{ duration: 0.3 }}
+                          className="h-full bg-gradient-to-r from-emerald-500 via-green-400 to-emerald-400 rounded-full shadow-lg shadow-emerald-500/50"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center text-xs bg-black/20 rounded-lg p-3">
+                      <span className="text-gray-300">
+                        ⏱️ Temps restant: <span className="text-emerald-400 font-bold">{uploadTimeRemaining || 'Calcul...'}</span>
+                      </span>
+                      {musicFile && (
+                        <span className="text-gray-300">
+                          📊 <span className="text-emerald-400 font-bold">{(musicFile.size / (1024 * 1024)).toFixed(2)} MB</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {/* Info Message */}
-                <div className="p-4 bg-luxury-gold/10 border border-luxury-gold/30 rounded-lg">
-                  <p className="text-sm text-gray-300">
-                    💡 <span className="text-luxury-gold font-bold">Info:</span> Les visiteurs verront et entendront la musique, mais seuls les admins peuvent la contrôler.
+                <div className="p-4 bg-emerald-500/15 border border-emerald-500/40 rounded-lg">
+                  <p className="text-sm text-emerald-300">
+                    ✅ <span className="font-bold">Recommandé:</span> Uploadez votre musique directement pour éviter les problèmes CORS!
                   </p>
                 </div>
               </div>
-            </div>
 
-            {/* Music History */}
-            <div className="glass p-8 rounded-3xl border border-white/10">
-              <h3 className="text-xl font-semibold text-luxury-gold uppercase tracking-widest mb-6">📜 Historique Musiques</h3>
+              {/* Music Controls */}
+              <div className="glass p-8 rounded-3xl border border-white/10">
+                <h3 className="text-xl font-semibold text-luxury-gold uppercase tracking-widest mb-6">🎛️ Contrôles</h3>
 
-              {musicHistory.length === 0 ? (
-                <p className="text-gray-400 text-center py-6">Aucune musique jouée pour le moment</p>
-              ) : (
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {musicHistory.map((entry, idx) => (
-                    <div key={idx} className="p-4 bg-white/5 border border-white/10 rounded-lg hover:border-luxury-gold/30 transition-all">
-                      <div className="flex items-start justify-between gap-4 mb-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-luxury-gold text-lg">
-                              {entry.action_type === 'music_upload' ? '📤' : '▶️'}
-                            </span>
-                            <p className="text-white font-bold text-sm">
-                              {entry.details?.musicName || entry.action_description}
+                <div className="space-y-6">
+                  {/* Play/Pause Button */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => toggleMusicPlayback()}
+                    disabled={musicSubmitting}
+                    className="w-full bg-gradient-to-r from-blue-600/80 to-blue-500/60 hover:from-blue-600 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-lg"
+                  >
+                    {isPlayingMusic ? (
+                      <>
+                        <Pause size={24} />
+                        Mettre en Pause
+                      </>
+                    ) : (
+                      <>
+                        <Play size={24} />
+                        Lancer la Musique
+                      </>
+                    )}
+                  </motion.button>
+
+                  {/* Volume Control */}
+                  <div className="space-y-3 p-4 bg-white/5 rounded-lg border border-white/10">
+                    <label className="block text-sm text-gray-300 font-bold">Contrôle du Volume</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={musicVolume}
+                      onChange={(e) => updateMusicVolume(parseInt(e.target.value))}
+                      className="w-full h-3 bg-white/10 rounded-lg appearance-none cursor-pointer accent-luxury-gold"
+                    />
+                    <div className="flex justify-between text-xs text-gray-400 font-bold">
+                      <span>🔇 Muet</span>
+                      <span className="text-luxury-gold">{musicVolume}%</span>
+                      <span>🔊 Max</span>
+                    </div>
+                  </div>
+
+                  {/* Info Message */}
+                  <div className="p-4 bg-luxury-gold/10 border border-luxury-gold/30 rounded-lg">
+                    <p className="text-sm text-gray-300">
+                      💡 <span className="text-luxury-gold font-bold">Info:</span> Les visiteurs verront et entendront la musique, mais seuls les admins peuvent la contrôler.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Music History */}
+              <div className="glass p-8 rounded-3xl border border-white/10">
+                <h3 className="text-xl font-semibold text-luxury-gold uppercase tracking-widest mb-6">📜 Historique Musiques</h3>
+
+                {musicHistory.length === 0 ? (
+                  <p className="text-gray-400 text-center py-6">Aucune musique jouée pour le moment</p>
+                ) : (
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {musicHistory.map((entry, idx) => (
+                      <div key={idx} className="p-4 bg-white/5 border border-white/10 rounded-lg hover:border-luxury-gold/30 transition-all">
+                        <div className="flex items-start justify-between gap-4 mb-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-luxury-gold text-lg">
+                                {entry.action_type === 'music_upload' ? '📤' : '▶️'}
+                              </span>
+                              <p className="text-white font-bold text-sm">
+                                {entry.details?.musicName || entry.action_description}
+                              </p>
+                            </div>
+                            {entry.details?.musicUrl && (
+                              <p className="text-xs text-gray-400 truncate">
+                                📁 {entry.details.musicUrl.split('/').pop()}
+                              </p>
+                            )}
+                            <p className="text-xs text-gray-500 mt-2">
+                              🕐 {new Date(entry.created_at).toLocaleString('fr-FR')}
                             </p>
                           </div>
-                          {entry.details?.musicUrl && (
-                            <p className="text-xs text-gray-400 truncate">
-                              📁 {entry.details.musicUrl.split('/').pop()}
+                        </div>
+
+                        {entry.details?.musicUrl && (
+                          <div className="flex gap-2 flex-wrap">
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(entry.details.musicUrl);
+                                console.log(`✅ URL copiée`);
+                              }}
+                              className="px-2 py-1 rounded bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/40 transition-all text-xs font-bold uppercase tracking-widest"
+                              title="Copier l'URL"
+                            >
+                              📋 Copier URL
+                            </button>
+                            <button
+                              onClick={async () => {
+                                setMusicUrl(entry.details.musicUrl);
+                                setMusicName(entry.details.musicName || 'Musique');
+                                await updateMusicUrl(entry.details.musicUrl, entry.details.musicName || 'Musique');
+                                console.log(`▶️ Lancement: ${entry.details.musicName}`);
+                              }}
+                              className="px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 transition-all text-xs font-bold uppercase tracking-widest"
+                              title="Lancer cette musique"
+                            >
+                              ▶️ Lancer
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )
+        }
+        {
+          activeTab === 'shop' && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-3xl font-bold text-luxury-gold">🛍️ Gestion Boutique</h2>
+                <button
+                  onClick={() => {
+                    setEditingProductId(null);
+                    setIsProductFormOpen(true);
+                  }}
+                  className="px-6 py-3 bg-luxury-gold text-black font-bold uppercase tracking-widest rounded-xl hover:bg-luxury-goldLight transition-all flex items-center gap-2"
+                >
+                  <Package size={20} /> Ajouter Produit
+                </button>
+              </div>
+
+              {isProductFormOpen ? (
+                <div className="glass p-8 rounded-[3rem] border border-white/5">
+                  <div className="mb-6 flex items-center justify-between">
+                    <h3 className="text-xl font-cinzel font-bold text-white uppercase tracking-widest">
+                      {editingProductId ? 'Modifier le Produit' : 'Nouveau Produit'}
+                    </h3>
+                    <button
+                      onClick={() => setIsProductFormOpen(false)}
+                      className="text-gray-400 hover:text-white transition-colors"
+                    >
+                      <X size={24} />
+                    </button>
+                  </div>
+                  <ProductForm
+                    productId={editingProductId || undefined}
+                    onSuccess={() => {
+                      setIsProductFormOpen(false);
+                      fetchProducts();
+                    }}
+                    onCancel={() => setIsProductFormOpen(false)}
+                  />
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {products.map((product) => (
+                    <div key={product.id} className="glass p-5 rounded-2xl border border-white/5 hover:border-luxury-gold/30 transition-all group">
+                      <div className="aspect-square bg-black/50 rounded-xl overflow-hidden mb-4 relative">
+                        <img
+                          src={product.image_url}
+                          alt={product.name}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        />
+                        {product.on_sale && (
+                          <div className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">
+                            Promo
+                          </div>
+                        )}
+                        {product.stock === 0 && (
+                          <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                            <span className="text-white font-bold uppercase tracking-widest border border-white px-3 py-1">Épuisé</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mb-4">
+                        <h4 className="font-bold text-white mb-1 truncate">{product.name}</h4>
+                        <div className="flex flex-col gap-1">
+                          {product.is_money_enabled && (
+                            <p className="text-luxury-gold text-lg font-cinzel font-bold">
+                              {product.on_sale ? product.sale_price : product.price} $
                             </p>
                           )}
-                          <p className="text-xs text-gray-500 mt-2">
-                            🕐 {new Date(entry.created_at).toLocaleString('fr-FR')}
-                          </p>
+                          {product.is_points_enabled && product.is_points_enabled > 0 && (
+                            <p className="text-blue-400 text-sm font-bold flex items-center gap-1">
+                              <Star size={14} className="fill-blue-400" />
+                              {product.points_price} PTS
+                            </p>
+                          )}
                         </div>
                       </div>
 
-                      {entry.details?.musicUrl && (
-                        <div className="flex gap-2 flex-wrap">
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(entry.details.musicUrl);
-                              console.log(`✅ URL copiée`);
-                            }}
-                            className="px-2 py-1 rounded bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/40 transition-all text-xs font-bold uppercase tracking-widest"
-                            title="Copier l'URL"
-                          >
-                            📋 Copier URL
-                          </button>
-                          <button
-                            onClick={async () => {
-                              setMusicUrl(entry.details.musicUrl);
-                              setMusicName(entry.details.musicName || 'Musique');
-                              await updateMusicUrl(entry.details.musicUrl, entry.details.musicName || 'Musique');
-                              console.log(`▶️ Lancement: ${entry.details.musicName}`);
-                            }}
-                            className="px-2 py-1 rounded bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40 transition-all text-xs font-bold uppercase tracking-widest"
-                            title="Lancer cette musique"
-                          >
-                            ▶️ Lancer
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setEditingProductId(product.id);
+                            setIsProductFormOpen(true);
+                          }}
+                          className="flex-1 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-xs font-bold uppercase transition-all"
+                        >
+                          Modifier
+                        </button>
+                        <button
+                          onClick={() => handleDeleteProduct(product.id)}
+                          className="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
-          </motion.div>
-        )}
-        {activeTab === 'shop' && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-3xl font-bold text-luxury-gold">🛍️ Gestion Boutique</h2>
-              <button
-                onClick={() => {
-                  setEditingProductId(null);
-                  setIsProductFormOpen(true);
-                }}
-                className="px-6 py-3 bg-luxury-gold text-black font-bold uppercase tracking-widest rounded-xl hover:bg-luxury-goldLight transition-all flex items-center gap-2"
-              >
-                <Package size={20} /> Ajouter Produit
-              </button>
-            </div>
+          )
+        }
+        {
+          activeTab === 'chat' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-6"
+            >
+              <h2 className="text-3xl font-bold text-luxury-gold">💬 Gestion du Chat</h2>
 
-            {isProductFormOpen ? (
-              <div className="glass p-8 rounded-[3rem] border border-white/5">
-                <div className="mb-6 flex items-center justify-between">
-                  <h3 className="text-xl font-cinzel font-bold text-white uppercase tracking-widest">
-                    {editingProductId ? 'Modifier le Produit' : 'Nouveau Produit'}
-                  </h3>
-                  <button
-                    onClick={() => setIsProductFormOpen(false)}
-                    className="text-gray-400 hover:text-white transition-colors"
-                  >
-                    <X size={24} />
-                  </button>
-                </div>
-                <ProductForm
-                  productId={editingProductId || undefined}
-                  onSuccess={() => {
-                    setIsProductFormOpen(false);
-                    fetchProducts();
-                  }}
-                  onCancel={() => setIsProductFormOpen(false)}
-                />
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {products.map((product) => (
-                  <div key={product.id} className="glass p-5 rounded-2xl border border-white/5 hover:border-luxury-gold/30 transition-all group">
-                    <div className="aspect-square bg-black/50 rounded-xl overflow-hidden mb-4 relative">
-                      <img
-                        src={product.image_url}
-                        alt={product.name}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                      />
-                      {product.on_sale && (
-                        <div className="absolute top-2 right-2 bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider">
-                          Promo
-                        </div>
-                      )}
-                      {product.stock === 0 && (
-                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                          <span className="text-white font-bold uppercase tracking-widest border border-white px-3 py-1">Épuisé</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mb-4">
-                      <h4 className="font-bold text-white mb-1 truncate">{product.name}</h4>
-                      <p className="text-luxury-gold text-lg font-cinzel font-bold">
-                        {product.on_sale ? product.sale_price : product.price} $
-                      </p>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setEditingProductId(product.id);
-                          setIsProductFormOpen(true);
-                        }}
-                        className="flex-1 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg text-xs font-bold uppercase transition-all"
-                      >
-                        Modifier
-                      </button>
-                      <button
-                        onClick={() => handleDeleteProduct(product.id)}
-                        className="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-all"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-        {activeTab === 'chat' && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="space-y-6"
-          >
-            <h2 className="text-3xl font-bold text-luxury-gold">💬 Gestion du Chat</h2>
-
-            <div className="glass p-10 rounded-[3rem] border border-white/10">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-                <div className="flex-1">
-                  <h3 className="text-2xl font-bold text-white mb-3">Chat Général</h3>
-                  <p className="text-gray-400 leading-relaxed">
-                    Contrôlez l'accès au canal de discussion général. Si verrouillé, seuls les administrateurs pourront envoyer des messages.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-6 p-6 glass rounded-2xl border border-white/5">
-                  <div className="flex flex-col items-center gap-2">
-                    <div className={`w-3 h-3 rounded-full ${isChatLocked ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Status</span>
-                  </div>
-
-                  <button
-                    onClick={toggleChatLock}
-                    disabled={chatSubmitting}
-                    className={`
-                      px-8 py-4 rounded-xl font-black uppercase tracking-[0.2em] transition-all duration-500
-                      ${isChatLocked
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30'
-                        : 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30'}
-                    `}
-                  >
-                    {chatSubmitting ? '...' : (isChatLocked ? 'Déverrouiller' : 'Verrouiller')}
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-12 p-6 bg-white/5 rounded-2xl border border-white/5">
-                <h4 className="text-sm font-bold text-luxury-gold uppercase tracking-widest mb-4">Fonctionnalités à venir</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 glass rounded-xl opacity-50 grayscale">
-                    <p className="text-xs font-bold text-white mb-1">Effacement Auto</p>
-                    <p className="text-[10px] text-gray-400">Nettoyage automatique des messages (24h)</p>
-                  </div>
-                  <div className="p-4 glass rounded-xl opacity-50 grayscale">
-                    <p className="text-xs font-bold text-white mb-1">Mots Interdits</p>
-                    <p className="text-[10px] text-gray-400">Filtrage des insultes et liens</p>
-                  </div>
-                  <div className="p-4 glass rounded-xl opacity-50 grayscale">
-                    <p className="text-xs font-bold text-white mb-1">Slow Mode</p>
-                    <p className="text-[10px] text-gray-400">Délai entre chaque message</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="glass p-10 rounded-[3rem] border border-white/10 mt-8">
-              <h3 className="text-2xl font-bold text-luxury-gold mb-8 uppercase tracking-widest">📁 Créer un Groupe</h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Nom du Groupe</label>
-                    <input
-                      type="text"
-                      value={newGroupName}
-                      onChange={(e) => setNewGroupName(e.target.value)}
-                      placeholder="Ex: Staff Atlantic"
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-white focus:border-luxury-gold/50 transition-all outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Description</label>
-                    <textarea
-                      value={newGroupDesc}
-                      onChange={(e) => setNewGroupDesc(e.target.value)}
-                      placeholder="Objectif du groupe..."
-                      className="w-full h-32 bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-white focus:border-luxury-gold/50 transition-all outline-none resize-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Participants (IDs séparés par des virgules)</label>
-                    <textarea
-                      value={groupParticipants}
-                      onChange={(e) => setGroupParticipants(e.target.value)}
-                      placeholder="00000000-0000-0000-0000-000000000000, ..."
-                      className="w-full h-32 bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-white font-mono text-xs focus:border-luxury-gold/50 transition-all outline-none resize-none"
-                    />
-                    <p className="text-[10px] text-gray-500 mt-2">
-                      Astuce: Vous pouvez trouver l'ID d'un utilisateur dans l'onglet "Utilisateurs".
+              <div className="glass p-10 rounded-[3rem] border border-white/10">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-bold text-white mb-3">Chat Général</h3>
+                    <p className="text-gray-400 leading-relaxed">
+                      Contrôlez l'accès au canal de discussion général. Si verrouillé, seuls les administrateurs pourront envoyer des messages.
                     </p>
                   </div>
 
-                  <div className="flex items-center justify-between p-5 glass rounded-2xl border border-white/5">
-                    <div>
-                      <p className="text-sm font-bold text-white mb-1">Visibilité Publique</p>
-                      <p className="text-[10px] text-gray-400">Si activé, tout le monde pourra voir et rejoindre ce groupe.</p>
+                  <div className="flex items-center gap-6 p-6 glass rounded-2xl border border-white/5">
+                    <div className="flex flex-col items-center gap-2">
+                      <div className={`w-3 h-3 rounded-full ${isChatLocked ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Status</span>
                     </div>
+
                     <button
-                      onClick={() => setIsGroupPublic(!isGroupPublic)}
-                      className={`w-14 h-7 rounded-full relative transition-all duration-300 ${isGroupPublic ? 'bg-luxury-gold' : 'bg-white/10'}`}
+                      onClick={toggleChatLock}
+                      disabled={chatSubmitting}
+                      className={`
+                      px-8 py-4 rounded-xl font-black uppercase tracking-[0.2em] transition-all duration-500
+                      ${isChatLocked
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30'
+                          : 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30'}
+                    `}
                     >
-                      <div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all duration-300 ${isGroupPublic ? 'left-8' : 'left-1'}`} />
+                      {chatSubmitting ? '...' : (isChatLocked ? 'Déverrouiller' : 'Verrouiller')}
                     </button>
                   </div>
+                </div>
 
-                  <button
-                    onClick={createGroup}
-                    disabled={chatSubmitting || !newGroupName.trim()}
-                    className="w-full py-5 bg-luxury-gold hover:bg-luxury-goldLight disabled:opacity-50 text-black font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-lg shadow-luxury-gold/20"
-                  >
-                    {chatSubmitting ? 'Création...' : 'Créer le Groupe'}
-                  </button>
+                <div className="mt-12 p-6 bg-white/5 rounded-2xl border border-white/5">
+                  <h4 className="text-sm font-bold text-luxury-gold uppercase tracking-widest mb-4">Fonctionnalités à venir</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 glass rounded-xl opacity-50 grayscale">
+                      <p className="text-xs font-bold text-white mb-1">Effacement Auto</p>
+                      <p className="text-[10px] text-gray-400">Nettoyage automatique des messages (24h)</p>
+                    </div>
+                    <div className="p-4 glass rounded-xl opacity-50 grayscale">
+                      <p className="text-xs font-bold text-white mb-1">Mots Interdits</p>
+                      <p className="text-[10px] text-gray-400">Filtrage des insultes et liens</p>
+                    </div>
+                    <div className="p-4 glass rounded-xl opacity-50 grayscale">
+                      <p className="text-xs font-bold text-white mb-1">Slow Mode</p>
+                      <p className="text-[10px] text-gray-400">Délai entre chaque message</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </motion.div>
-        )}
-        {toast && (
-          <Toast
-            message={toast.message}
-            type={toast.type}
-            onClose={() => setToast(null)}
-          />
-        )}
-      </div>
-    </motion.div>
+
+              <div className="glass p-10 rounded-[3rem] border border-white/10 mt-8">
+                <h3 className="text-2xl font-bold text-luxury-gold mb-8 uppercase tracking-widest">📁 Créer un Groupe</h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-6">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Nom du Groupe</label>
+                      <input
+                        type="text"
+                        value={newGroupName}
+                        onChange={(e) => setNewGroupName(e.target.value)}
+                        placeholder="Ex: Staff Atlantic"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-white focus:border-luxury-gold/50 transition-all outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Description</label>
+                      <textarea
+                        value={newGroupDesc}
+                        onChange={(e) => setNewGroupDesc(e.target.value)}
+                        placeholder="Objectif du groupe..."
+                        className="w-full h-32 bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-white focus:border-luxury-gold/50 transition-all outline-none resize-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Participants (IDs séparés par des virgules)</label>
+                      <textarea
+                        value={groupParticipants}
+                        onChange={(e) => setGroupParticipants(e.target.value)}
+                        placeholder="00000000-0000-0000-0000-000000000000, ..."
+                        className="w-full h-32 bg-white/5 border border-white/10 rounded-xl px-5 py-4 text-white font-mono text-xs focus:border-luxury-gold/50 transition-all outline-none resize-none"
+                      />
+                      <p className="text-[10px] text-gray-500 mt-2">
+                        Astuce: Vous pouvez trouver l'ID d'un utilisateur dans l'onglet "Utilisateurs".
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-between p-5 glass rounded-2xl border border-white/5">
+                      <div>
+                        <p className="text-sm font-bold text-white mb-1">Visibilité Publique</p>
+                        <p className="text-[10px] text-gray-400">Si activé, tout le monde pourra voir et rejoindre ce groupe.</p>
+                      </div>
+                      <button
+                        onClick={() => setIsGroupPublic(!isGroupPublic)}
+                        className={`w-14 h-7 rounded-full relative transition-all duration-300 ${isGroupPublic ? 'bg-luxury-gold' : 'bg-white/10'}`}
+                      >
+                        <div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all duration-300 ${isGroupPublic ? 'left-8' : 'left-1'}`} />
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={createGroup}
+                      disabled={chatSubmitting || !newGroupName.trim()}
+                      className="w-full py-5 bg-luxury-gold hover:bg-luxury-goldLight disabled:opacity-50 text-black font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-lg shadow-luxury-gold/20"
+                    >
+                      {chatSubmitting ? 'Création...' : 'Créer le Groupe'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )
+        }
+        {
+          toast && (
+            <Toast
+              message={toast.message}
+              type={toast.type}
+              onClose={() => setToast(null)}
+            />
+          )
+        }
+      </div >
+    </motion.div >
   );
 };
 

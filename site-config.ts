@@ -3,6 +3,7 @@ export const siteConfig = {
   server: {
     name: "Atlantic RP",
     ip: "45.8.187.146",
+    cfxId: "", // Laissez vide si vous n'avez pas d'ID Cfx.re valide pour éviter les erreurs 404
     connectUrl: "fivem://connect/45.8.187.146",
     playersOnline: 124,
     maxPlayers: 250,

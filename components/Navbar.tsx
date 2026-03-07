@@ -33,6 +33,7 @@ const Navbar: React.FC<NavbarProps> = ({ profile }) => {
       { label: 'Chat', path: '/chat', visible: !!profile && isPageVisible('Chat') },
       { label: 'Blog', path: '/blog', visible: isPageVisible('Blog') },
       { label: 'Shop', path: '/shop', visible: isPageVisible('Shop') },
+      { label: '🎮 Jeux', path: '/game', visible: !!profile && isPageVisible('WheelGame') },
       { label: t('nav.media'), path: '/media', restricted: true, visible: isPageVisible('Gallery') },
     ];
 
